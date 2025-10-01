@@ -15,7 +15,7 @@ public class UserServiceImplementation implements UserService {
     UserRepository userRepository;
 
     @Override
-    public User getUser(String userId) {
+    public User getUser(Long userId) {
         return userRepository.findById(userId).get();
     }
 
@@ -37,7 +37,7 @@ public class UserServiceImplementation implements UserService {
     }
 
     @Override
-    public String deleteUser(String userId) {
+    public String deleteUser(Long userId) {
         userRepository.deleteById(userId);
         return "User deleted successfully";
     }

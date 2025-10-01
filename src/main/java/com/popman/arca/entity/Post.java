@@ -7,7 +7,8 @@ import jakarta.persistence.*;
 @Table(name = "posts")
 public class Post {
     @Id
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     private int post_id;
     private int version;
@@ -15,6 +16,7 @@ public class Post {
     private String title;
     private String content;
     private String status;
+
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
@@ -85,11 +87,11 @@ public class Post {
         this.post_id = post_id;
     }
 
-    public String getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
