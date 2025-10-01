@@ -8,11 +8,15 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 @Service
 public class DepartmentServiceImplementation implements DepartmentService{
-    DepartmentRepository departmentRepository;
+    private final DepartmentRepository departmentRepository;
+
+    public DepartmentServiceImplementation(DepartmentRepository departmentRepository) {
+        this.departmentRepository = departmentRepository;
+    }
 
     @Override
-    public Department getDepartment(String departmentId) {
-        return departmentRepository.findById(departmentId).get();
+    public Department getDepartment(Long departmentId) {
+        return departmentRepository.findById(departmentId).orElseThrow(() -> new RuntimeException("Department not found: " + departmentId));
     }
 
     @Override
@@ -21,20 +25,21 @@ public class DepartmentServiceImplementation implements DepartmentService{
     }
 
     @Override
-    public String createDepartment(Department department) {
-        departmentRepository.save(department);
-        return "Department Added";
+    public Department createDepartment(Department department) {
+        return departmentRepository.save(department);
     }
 
     @Override
-    public String updateDepartment(Department department) {
-        departmentRepository.save(department);
-        return "Department Updated";
+    public Department updateDepartment(Department department) {
+        Department existing = getDepartment(department.getId());
+        existing.setName(department.getName());
+        existing.setId(department.getId());
+
+        return departmentRepository.save(existing);
     }
 
     @Override
-    public String deleteDepartment(String departmentId) {
+    public void deleteDepartment(Long departmentId) {
         departmentRepository.deleteById(departmentId);
-        return "Department deleted";
     }
 }

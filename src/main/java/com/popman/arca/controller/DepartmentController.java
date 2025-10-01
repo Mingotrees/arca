@@ -2,10 +2,7 @@ package com.popman.arca.controller;
 
 import com.popman.arca.service.DepartmentService;
 import com.popman.arca.entity.Department;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -13,13 +10,13 @@ import java.util.List;
 @RequestMapping("api/department")
 public class DepartmentController {
 
-    DepartmentService departmentService;
+    private final DepartmentService departmentService;
 
     public DepartmentController(DepartmentService departmentService){
         this.departmentService = departmentService;
     }
    @GetMapping("{departmentId}")
-    public Department getDepartmentDetails(@PathVariable("departmentId") String departmentId){
+    public Department getDepartmentDetails(@PathVariable("departmentId") Long departmentId){
         return departmentService.getDepartment(departmentId);
     }
     @GetMapping
@@ -27,16 +24,20 @@ public class DepartmentController {
         return departmentService.getAllDepartment();
     }
 
-    public String createUser(Department department){
+    @PostMapping
+    public Department createDepartment(@RequestBody Department department){
         return departmentService.createDepartment(department);
     }
 
-    public String updateUser(Department department){
+    @PutMapping("{departmentId}")
+    public Department updateDepartment(@PathVariable("departmentId") Long departmentId, @RequestBody Department department){
+        department.setId(departmentId);
         return departmentService.updateDepartment(department);
     }
 
-    public String deleteUser(String departmentId){
-        return departmentService.deleteDepartment(departmentId);
+    @DeleteMapping("{departmentId}")
+    public void deleteDepartment(@PathVariable("departmentId") Long departmentId){
+        departmentService.deleteDepartment(departmentId);
     }
 
 }
