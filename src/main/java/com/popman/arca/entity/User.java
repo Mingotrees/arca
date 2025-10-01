@@ -10,7 +10,7 @@ import jakarta.persistence.Table;
 public class User {
 
     @Id
-    private String id;
+    private Long id;
 
     @Column(length = 8)
     private String type;
@@ -30,7 +30,7 @@ public class User {
 
     }
 
-    public User(String id, String type, String firstName, String lastName, String password, String course, String department, String bio, String profilePicture) {
+    public User(Long id, String type, String firstName, String lastName, String password, String course, String department, String bio, String profilePicture) {
         this.id = id;
         this.type = type;
         this.firstName = firstName;
@@ -42,11 +42,11 @@ public class User {
         this.profilePicture = profilePicture;
     }
 
-    public String getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
