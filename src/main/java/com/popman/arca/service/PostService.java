@@ -10,13 +10,13 @@ public interface PostService {
     public Post getPost(Long postId);
 
     //retrieve all posts made by a specific user
-    public List<Post> getAllUserPost(Long postId, Long userId);
+    public List<Post> getAllUserPost(Long userId);
 
     //retrieve all posts associated with a specific department
-    public List<Post> getPostByDepartment(Long postId, Long departmentId);
+    public List<Post> getAllDepartmentPost(Long departmentId);
 
     //need to add postTags in here to ensure one call only for creating
-    public String createPost(Post post, Long userId, Long departmentId);
+    public String createPost(Post post);
 
     //update
     public String updatePost(Post post, Long postId);
