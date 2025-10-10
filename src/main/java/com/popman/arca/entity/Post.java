@@ -10,7 +10,6 @@ public class Post {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int post_id;
     private int version;
     @Column(length = 30)
@@ -24,21 +23,21 @@ public class Post {
     private User user;
 
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "department_id", insertable = false, updatable = false)
-//    private Department department;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id", insertable = false, updatable = false)
+    private Department department;
 
     public Post() {
 
     }
 
-//    public Department getDepartment() {
-//        return department;
-//    }
+    public Department getDepartment() {
+        return department;
+    }
 
-//    public void setDepartment(Department department) {
-//        this.department = department;
-//    }
+    public void setDepartment(Department department) {
+        this.department = department;
+    }
 
     public User getUser() {
         return user;
