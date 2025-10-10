@@ -2,6 +2,7 @@ package com.popman.arca.service.impl;
 
 
 import com.popman.arca.entity.Post;
+import com.popman.arca.repository.PostRepository;
 import com.popman.arca.service.PostService;
 import org.springframework.stereotype.Service;
 
@@ -9,6 +10,7 @@ import java.util.List;
 
 @Service
 public class PostServiceImplementation implements PostService {
+    private PostRepository postRepository;
 
     @Override
     public Post getPost(Long postId) {
@@ -27,6 +29,7 @@ public class PostServiceImplementation implements PostService {
 
     @Override
     public String createPost(Post post) {
+        //create a post_id generator
         return "";
     }
 

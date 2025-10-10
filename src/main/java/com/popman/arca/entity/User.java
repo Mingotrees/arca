@@ -1,22 +1,26 @@
 package com.popman.arca.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
+import java.time.LocalDateTime;
+
 
 @Entity
+@SQLDelete(sql = "UPDATE users SET is_deleted = true, deleted_at = NOW() WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 @Table(name="users")
 public class User {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(length = 8)
-    private String type;
     private String firstName;
     private String lastName;
     private String password;
+    private String email;
 
     @Column(length = 24)
     private String course;
@@ -26,13 +30,20 @@ public class User {
     private String bio;
     private String profilePicture;
 
+    @Column(name = "is_deleted")
+    private boolean isDeleted = false;
+    private LocalDateTime deletedAt;
+
+    //user and admin
+    private String role;
+
+
     public User(){
 
     }
 
     public User(Long id, String type, String firstName, String lastName, String password, String course, String department, String bio, String profilePicture) {
         this.id = id;
-        this.type = type;
         this.firstName = firstName;
         this.lastName = lastName;
         this.password = password;
@@ -42,20 +53,44 @@ public class User {
         this.profilePicture = profilePicture;
     }
 
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
     public Long getId() {
         return id;
     }
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public String getType() {
-        return type;
-    }
-
-    public void setType(String type) {
-        this.type = type;
     }
 
     public String getFirstName() {
