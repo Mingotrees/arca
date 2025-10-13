@@ -29,11 +29,11 @@ public class FileController {
     }
 
     @GetMapping("/download/{id}")
-    public ResponseEntity<File> downloadFile(@PathVariable Long id) throws IOException {
+    public ResponseEntity<Resource> downloadFile(@PathVariable Long id) throws IOException {
         Resource fileResource = fileService.downloadFile(id);
         File fileEntity = fileService.getFile(id).orElseThrow(()-> new IOException("File metadata not found"));
 
-        return ResponseEntity.ok().contentType(MediaType.parseMediaType(fileEntity.getFileType())).header(HttpHeaders.CONTENT_DISPOSITION);
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(fileEntity.getFileType())).header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\"" + fileEntity.getFileName() + "\"").body(fileResource);
     }
     @GetMapping("/{id}")
     public ResponseEntity<File> getFileInfo(@PathVariable Long id){
