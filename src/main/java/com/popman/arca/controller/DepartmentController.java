@@ -1,43 +1,47 @@
 package com.popman.arca.controller;
 
+import com.popman.arca.dto.department.DepartmentDetailResponse;
+import com.popman.arca.dto.department.DepartmentRequest;
+import com.popman.arca.dto.department.DepartmentResponse;
 import com.popman.arca.service.DepartmentService;
-import com.popman.arca.entity.Department;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("api/department")
+@RequestMapping("api/departments")
 public class DepartmentController {
 
     private final DepartmentService departmentService;
 
-    public DepartmentController(DepartmentService departmentService){
+    public DepartmentController(DepartmentService departmentService) {
         this.departmentService = departmentService;
     }
-   @GetMapping("{departmentId}")
-    public Department getDepartmentDetails(@PathVariable("departmentId") Long departmentId){
-        return departmentService.getDepartment(departmentId);
+
+    @GetMapping("/{id}")
+    public ResponseEntity<DepartmentDetailResponse> getDepartment(@PathVariable Long id) {
+        return ResponseEntity.ok(departmentService.getDepartment(id));
     }
+
     @GetMapping
-    public List<Department> getAllDepartment(){
-        return departmentService.getAllDepartment();
+    public ResponseEntity<List<DepartmentDetailResponse>> getAllDepartments() {
+        return ResponseEntity.ok(departmentService.getAllDepartments());
     }
 
-    @PostMapping
-    public Department createDepartment(@RequestBody Department department){
-        return departmentService.createDepartment(department);
+    @PostMapping("/add")
+    public ResponseEntity<DepartmentDetailResponse> createDepartment(@RequestBody DepartmentRequest request) {
+        return ResponseEntity.ok(departmentService.createDepartment(request));
     }
 
-    @PutMapping("{departmentId}")
-    public Department updateDepartment(@PathVariable("departmentId") Long departmentId, @RequestBody Department department){
-        department.setId(departmentId);
-        return departmentService.updateDepartment(department);
+    @PutMapping("/{id}")
+    public ResponseEntity<DepartmentDetailResponse> updateDepartment(@PathVariable Long id, @RequestBody DepartmentRequest request) {
+        return ResponseEntity.ok(departmentService.updateDepartment(id, request));
     }
 
-    @DeleteMapping("{departmentId}")
-    public void deleteDepartment(@PathVariable("departmentId") Long departmentId){
-        departmentService.deleteDepartment(departmentId);
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteDepartment(@PathVariable Long id) {
+        departmentService.deleteDepartment(id);
+        return ResponseEntity.noContent().build();
     }
-
 }
