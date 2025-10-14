@@ -3,17 +3,17 @@ package com.popman.arca.dto.department;
 public class DepartmentDetailResponse {
     private Long id;
     private String name;
-    private Long school_id;
-    private String school_name;
+    private Long schoolId;
+    private String schoolName;
 
     public DepartmentDetailResponse() {
     }
 
-    public DepartmentDetailResponse(Long id, String name, Long school_id, String school_name) {
+    public DepartmentDetailResponse(Long id, String name, Long schoolId, String schoolName) {
         this.id = id;
         this.name = name;
-        this.school_id = school_id;
-        this.school_name = school_name;
+        this.schoolId = schoolId;
+        this.schoolName = schoolName;
     }
 
     public Long getId() {
@@ -33,18 +33,18 @@ public class DepartmentDetailResponse {
     }
 
     public Long getSchoolId() {
-        return school_id;
+        return schoolId;
     }
 
-    public void setSchoolId(Long school_id) {
-        this.school_id = school_id;
+    public void setSchoolId(Long schoolId) {
+        this.schoolId = schoolId;
     }
 
     public String getSchoolName() {
-        return school_name;
+        return schoolName;
     }
 
-    public void setSchoolName(String school_name) {
-        this.school_name = school_name;
+    public void setSchoolName(String schoolName) {
+        this.schoolName = schoolName;
     }
 }
