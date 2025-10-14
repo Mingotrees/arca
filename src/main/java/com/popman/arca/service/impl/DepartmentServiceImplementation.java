@@ -1,45 +1,85 @@
 package com.popman.arca.service.impl;
 
+import com.popman.arca.dto.department.DepartmentDetailResponse;
+import com.popman.arca.dto.department.DepartmentRequest;
 import com.popman.arca.entity.Department;
+import com.popman.arca.entity.School;
 import com.popman.arca.repository.DepartmentRepository;
+import com.popman.arca.repository.SchoolRepository;
 import com.popman.arca.service.DepartmentService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
+
 @Service
-public class DepartmentServiceImplementation implements DepartmentService{
+public class DepartmentServiceImplementation implements DepartmentService {
+
     private final DepartmentRepository departmentRepository;
+    private final SchoolRepository schoolRepository;
 
-    public DepartmentServiceImplementation(DepartmentRepository departmentRepository) {
+    public DepartmentServiceImplementation(DepartmentRepository departmentRepository, SchoolRepository schoolRepository) {
         this.departmentRepository = departmentRepository;
+        this.schoolRepository = schoolRepository;
     }
 
     @Override
-    public Department getDepartment(Long departmentId) {
-        return departmentRepository.findById(departmentId).orElseThrow(() -> new RuntimeException("Department not found: " + departmentId));
+    public DepartmentDetailResponse getDepartment(Long id) {
+        Department department = departmentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Department not found with ID: " + id));
+        return mapToDepartmentDetailResponse(department);
     }
 
     @Override
-    public List<Department> getAllDepartment() {
-        return departmentRepository.findAll();
+    public List<DepartmentDetailResponse> getAllDepartments() {
+        return departmentRepository.findAll()
+                .stream()
+                .map(this::mapToDepartmentDetailResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public Department createDepartment(Department department) {
-        return departmentRepository.save(department);
+    public DepartmentDetailResponse createDepartment(DepartmentRequest departmentRequest) {
+        School school = schoolRepository.findById(departmentRequest.getSchoolId())
+                .orElseThrow(() -> new RuntimeException("School not found with ID: " + departmentRequest.getSchoolId()));
+
+        Department department = new Department();
+        department.setName(departmentRequest.getName());
+        department.setSchool(school);
+
+        Department saved = departmentRepository.save(department);
+        return mapToDepartmentDetailResponse(saved);
     }
 
     @Override
-    public Department updateDepartment(Department department) {
-        Department existing = getDepartment(department.getId());
-        existing.setName(department.getName());
-        existing.setId(department.getId());
+    public DepartmentDetailResponse updateDepartment(Long id, DepartmentRequest departmentRequest) {
+        Department department = departmentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Department not found with ID: " + id));
 
-        return departmentRepository.save(existing);
+        department.setName(departmentRequest.getName());
+
+        if (departmentRequest.getSchoolId() != null &&
+                !department.getSchool().getId().equals(departmentRequest.getSchoolId())) {
+            School school = schoolRepository.findById(departmentRequest.getSchoolId())
+                    .orElseThrow(() -> new RuntimeException("School not found with ID: " + departmentRequest.getSchoolId()));
+            department.setSchool(school);
+        }
+
+        Department updated = departmentRepository.save(department);
+        return mapToDepartmentDetailResponse(updated);
     }
 
     @Override
     public void deleteDepartment(Long departmentId) {
         departmentRepository.deleteById(departmentId);
+    }
+
+    private DepartmentDetailResponse mapToDepartmentDetailResponse(Department department) {
+        return new DepartmentDetailResponse(
+                department.getId(),
+                department.getName(),
+                department.getSchool() != null ? department.getSchool().getId() : null,
+                department.getSchool() != null ? department.getSchool().getName() : null
+        );
     }
 }
