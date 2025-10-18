@@ -1,7 +1,13 @@
 package com.popman.arca.controller;
 
-import com.popman.arca.entity.Post;
+import com.popman.arca.dto.Post.PostApprovalRequest;
+import com.popman.arca.dto.Post.PostRequest;
+import com.popman.arca.dto.Post.PostResponse;
+import com.popman.arca.dto.Post.PostUpdateRequest;
 import com.popman.arca.service.PostService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -9,39 +15,80 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/posts")
 public class PostController {
-    PostService postService;
+
+    private final PostService postService;
 
     public PostController(PostService postService) {
         this.postService = postService;
     }
 
-    @GetMapping("{postId}")
-    public Post getPost(@PathVariable("postId") Long postId){
-        return postService.getPost(postId);
+    // === User Operations ===
+
+    @GetMapping("/{postId}")
+    public ResponseEntity<PostResponse> getPost(@PathVariable("postId") Long postId) {
+        PostResponse response = postService.getPost(postId);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/user/{userId}")
-    public List<Post> getAllUserPost(@PathVariable("userId") Long userId){
-        return postService.getAllUserPost(userId);
+    public ResponseEntity<List<PostResponse>> getAllUserPost(@PathVariable("userId") Long userId) {
+        List<PostResponse> posts = postService.getAllUserPost(userId);
+        return ResponseEntity.ok(posts);
     }
 
     @GetMapping("/department/{departmentId}")
-    public List<Post> getAllDepartmentPost(@PathVariable("departmentId") Long departmentId){
-        return postService.getAllDepartmentPost(departmentId);
+    public ResponseEntity<List<PostResponse>> getAllDepartmentPost(@PathVariable("departmentId") Long departmentId) {
+        List<PostResponse> posts = postService.getAllDepartmentPost(departmentId);
+        return ResponseEntity.ok(posts);
     }
 
     @PostMapping
-    public String createPost(Post newPost){
-        return postService.createPost(newPost);
+    public ResponseEntity<String> createPost(@Valid @RequestBody PostRequest newPost) {
+        String message = postService.createPost(newPost);
+        return ResponseEntity.status(HttpStatus.CREATED).body(message);
     }
 
-    @PutMapping("{postId}")
-    public String updatePost(Post updatedPost, @PathVariable("postId") Long postId){
-        return postService.updatePost(updatedPost, postId);
+    @PutMapping("/{postId}")
+    public ResponseEntity<String> updatePost(
+            @Valid @RequestBody PostUpdateRequest updatedPost,
+            @PathVariable("postId") Long postId) {
+        String message = postService.updatePost(updatedPost, postId);
+        return ResponseEntity.ok(message);
     }
 
-    @DeleteMapping("{postId}")
-    public String deletePost(@PathVariable("postId") Long postId){
-        return postService.deletePost(postId);
+    @DeleteMapping("/{postId}")
+    public ResponseEntity<String> deletePost(@PathVariable("postId") Long postId) {
+        String message = postService.deletePost(postId);
+        return ResponseEntity.ok(message);
     }
+
+    // === Admin Operations ===
+
+    @GetMapping("/pending")
+    public ResponseEntity<List<PostResponse>> getAllPendingApprovalPosts() {
+        List<PostResponse> pendingPosts = postService.getAllPendingApprovalPosts();
+        return ResponseEntity.ok(pendingPosts);
+    }
+
+    @PostMapping("/{postId}/approve")
+    public ResponseEntity<String> approvePost(
+            @Valid @RequestBody PostApprovalRequest approvalRequest,
+            @PathVariable("postId") Long postId) {
+        String message = postService.approvePost(approvalRequest, postId);
+        return ResponseEntity.ok(message);
+    }
+
+    // === Version History ===
+
+    @GetMapping("/history/{postId}")
+    public ResponseEntity<List<PostResponse>> getPostHistory(@PathVariable("postId") Integer postId) {
+        List<PostResponse> versions = postService.getPostHistory(postId);
+        return ResponseEntity.ok(versions);
+    }
+
+//    @GetMapping("/latest/{postId}")
+//    public ResponseEntity<PostResponse> getLatestVersion(@PathVariable("postId") Integer postId) {
+//        PostResponse latestVersion = postService.getLatestVersion(postId);
+//        return ResponseEntity.ok(latestVersion);
+//    }
 }

@@ -1,25 +1,38 @@
 package com.popman.arca.service;
 
 
+import com.popman.arca.dto.Post.PostApprovalRequest;
+import com.popman.arca.dto.Post.PostRequest;
+import com.popman.arca.dto.Post.PostResponse;
+import com.popman.arca.dto.Post.PostUpdateRequest;
 import com.popman.arca.entity.Post;
 
 import java.util.List;
 
 public interface PostService {
     //retrieve specific post
-    public Post getPost(Long postId);
+    public PostResponse getPost(Long postId);
 
     //retrieve all posts made by a specific user
-    public List<Post> getAllUserPost(Long userId);
+    public List<PostResponse> getAllUserPost(Long userId);
 
     //retrieve all posts associated with a specific department
-    public List<Post> getAllDepartmentPost(Long departmentId);
+    public List<PostResponse> getAllDepartmentPost(Long departmentId);
 
-    //need to add postTags in here to ensure one call only for creating
-    public String createPost(Post post);
+    //create post
+    public String createPost(PostRequest post);
 
     //update
-    public String updatePost(Post post, Long postId);
+    public String updatePost(PostUpdateRequest updateRequest, Long postId);
+
+    //fetch all that needs approval
+    public List<PostResponse> getAllPendingApprovalPosts();
+
+    //approve post
+    public String approvePost(PostApprovalRequest postApprovalRequest, Long postId);
+
+    //previous versions of a post
+    public List<PostResponse> getPostHistory(Integer postId);
 
     //softDelete
     public String deletePost(Long postId);

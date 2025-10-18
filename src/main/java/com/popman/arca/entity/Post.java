@@ -1,66 +1,87 @@
 package com.popman.arca.entity;
 
-
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "posts")
+@Table(name = "posts", indexes = {
+        @Index(name = "idx_post_id_version", columnList = "post_id, version"),
+        @Index(name = "idx_user_id", columnList = "user_id"),
+        @Index(name = "idx_department_id", columnList = "department_id"),
+        @Index(name = "idx_status", columnList = "status")
+})
 public class Post {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private int post_id;
-    private int version;
-    @Column(length = 30)
+    @Column(nullable = false)
+    private Integer post_id;
+
+    @Column(nullable = false)
+    private Integer version;
+
+    @Column(length = 30, nullable = false)
     private String title;
+
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
+
+    @Column(nullable = false)
     private String status;
 
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
+    @Column(name = "department_id", nullable = false)
+    private Long departmentId;
+
+    @Column(name = "is_latest_version", nullable = false)
+    private Boolean isLatestVersion = true;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
     private User user;
 
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id", insertable = false, updatable = false)
     private Department department;
 
-    public Post() {
 
+    public Post() {}
+
+
+    public Long getId() {
+        return id;
     }
 
-    public Department getDepartment() {
-        return department;
+    public void setId(Long id) {
+        this.id = id;
     }
 
-    public void setDepartment(Department department) {
-        this.department = department;
+    public Integer getPost_id() {
+        return post_id;
     }
 
-    public User getUser() {
-        return user;
+    public void setPost_id(Integer post_id) {
+        this.post_id = post_id;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public Integer getVersion() {
+        return version;
     }
 
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
+    public void setVersion(Integer version) {
+        this.version = version;
     }
 
     public String getTitle() {
@@ -71,30 +92,83 @@ public class Post {
         this.title = title;
     }
 
-    public int getVersion() {
-        return version;
+    public String getContent() {
+        return content;
     }
 
-    public void setVersion(int version) {
-        this.version = version;
+    public void setContent(String content) {
+        this.content = content;
     }
 
-    public int getPost_id() {
-        return post_id;
+    public String getStatus() {
+        return status;
     }
 
-    public void setPost_id(int post_id) {
-        this.post_id = post_id;
+    public void setStatus(String status) {
+        this.status = status;
     }
 
-    public Long getId() {
-        return id;
+    public Long getUserId() {
+        return userId;
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
+    public Long getDepartmentId() {
+        return departmentId;
+    }
 
+    public void setDepartmentId(Long departmentId) {
+        this.departmentId = departmentId;
+    }
 
+    public Boolean getIsLatestVersion() {
+        return isLatestVersion;
+    }
+
+    public void setIsLatestVersion(Boolean isLatestVersion) {
+        this.isLatestVersion = isLatestVersion;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public Department getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(Department department) {
+        this.department = department;
+    }
 }
