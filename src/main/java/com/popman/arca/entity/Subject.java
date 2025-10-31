@@ -4,10 +4,15 @@ package com.popman.arca.entity;
 import jakarta.persistence.*;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
-@Table(name="subjects")
+@Table(name="subjects", uniqueConstraints = {
+        @UniqueConstraint(columnNames = "code"),
+        @UniqueConstraint(columnNames = "name")
+})
 public class Subject {
 
     @Id
@@ -28,13 +33,16 @@ public class Subject {
     @Column(name = "alias")
     private List<String> aliases = new ArrayList<>();
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "department_subjects",
             joinColumns = @JoinColumn(name = "subject_id"),
             inverseJoinColumns = @JoinColumn(name = "department_id")
     )
     private List<Department> listDepartments = new ArrayList<>();
+
+    @ManyToMany(mappedBy = "subjects", fetch = FetchType.LAZY)
+    private Set<Post> posts = new HashSet<>();
 
     public Subject() {
     }

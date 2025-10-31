@@ -1,4 +1,5 @@
 package com.popman.arca.controller;
+import com.popman.arca.dto.subject.SubjectResponse;
 import com.popman.arca.entity.Subject;
 import com.popman.arca.service.SubjectService;
 import org.springframework.web.bind.annotation.*;
@@ -9,30 +10,33 @@ import java.util.List;
 @RequestMapping("api/subject")
 public class SubjectController {
 
-   SubjectService subjectService;
+    private final SubjectService subjectService;
 
    public SubjectController(SubjectService subjectService){
        this.subjectService = subjectService;
    }
     @GetMapping
-    public List<Subject> getAllSubjects(){
-       return subjectService.getAllSubjects();
+    public List<SubjectResponse> getAllSubjects(){
+       return subjectService.getAllSubjects().stream().map(subjectService::mapToResponse).toList();
     }
 
    @GetMapping("{subjectId}")
-    public Subject getSubjectDetails(@PathVariable("subjectId") Long subjectId){
-       return subjectService.getSubjectById(subjectId);
+    public SubjectResponse getSubjectDetails(@PathVariable("subjectId") Long subjectId){
+       Subject subject = subjectService.getSubjectById(subjectId);
+
+       return subjectService.mapToResponse(subject);
     }
 
     @PostMapping
-    public Subject createSubject(@RequestBody Subject subject){
-       return subjectService.createSubject(subject);
+    public SubjectResponse createSubject(@RequestBody Subject subject){
+       Subject created = subjectService.createSubject(subject);
+       return subjectService.mapToResponse(created);
     }
 
     @PutMapping("{subjectId}")
-    public Subject updateSubject(@PathVariable("subjectId") Long subjectId, @RequestBody Subject updatedSubject){
-
-       return subjectService.updateSubject(subjectId, updatedSubject);
+    public SubjectResponse updateSubject(@PathVariable("subjectId") Long subjectId, @RequestBody Subject updatedSubject){
+        Subject updated = subjectService.updateSubject(subjectId, updatedSubject);
+       return subjectService.mapToResponse(updated);
     }
 
     @DeleteMapping("{subjectId}")
