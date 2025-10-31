@@ -2,6 +2,8 @@ package com.popman.arca.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "posts", indexes = {
@@ -55,6 +57,10 @@ public class Post {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id", insertable = false, updatable = false)
     private Department department;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "post_tags", joinColumns = @JoinColumn(name = "post_id"), inverseJoinColumns = @JoinColumn(name = "subject_id"))
+    private Set<Subject> subjects = new HashSet<>();
 
 
     public Post() {}
@@ -170,5 +176,13 @@ public class Post {
 
     public void setDepartment(Department department) {
         this.department = department;
+    }
+
+    public Set<Subject> getSubjects() {
+        return subjects;
+    }
+
+    public void setSubjects(Set<Subject> subjects) {
+        this.subjects = subjects;
     }
 }

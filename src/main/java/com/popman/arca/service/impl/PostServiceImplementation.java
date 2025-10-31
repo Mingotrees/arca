@@ -7,9 +7,11 @@ import com.popman.arca.dto.Post.PostResponse;
 import com.popman.arca.dto.Post.PostUpdateRequest;
 import com.popman.arca.entity.Department;
 import com.popman.arca.entity.Post;
+import com.popman.arca.entity.Subject;
 import com.popman.arca.entity.User;
 import com.popman.arca.repository.DepartmentRepository;
 import com.popman.arca.repository.PostRepository;
+import com.popman.arca.repository.SubjectRepository;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.PostService;
 import jakarta.transaction.Transactional;
@@ -17,7 +19,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,6 +35,9 @@ public class PostServiceImplementation implements PostService {
 
     @Autowired
     private DepartmentRepository departmentRepository;
+
+    @Autowired
+    private SubjectRepository subjectRepository;
 
     @Override
     public PostResponse getPost(Long postId) {
@@ -78,6 +85,15 @@ public class PostServiceImplementation implements PostService {
         post.setUpdatedAt(LocalDateTime.now());
         post.setCreatedAt(LocalDateTime.now());
 
+        if(request.getSubjectId() != null && !request.getSubjectId().isEmpty()){
+
+            Set<Subject> subjects = new HashSet<>(subjectRepository.findSubjectByIdsAndDepartment(request.getSubjectId(), request.getDepartmentId()));
+
+            if(subjects.size() != request.getSubjectId().size()){
+                throw new RuntimeException("Some subjects do not belong to the department id " + request.getDepartmentId());
+            }
+            post.setSubjects(subjects);
+        }
         postRepository.save(post);
 
         return "Post created successfully with Id" + post.getId() + ". Awaiting admin approval";
