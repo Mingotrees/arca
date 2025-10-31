@@ -1,4 +1,6 @@
 package com.popman.arca.service.impl;
+import com.popman.arca.dto.department.DepartmentResponse;
+import com.popman.arca.dto.subject.SubjectResponse;
 import com.popman.arca.entity.Department;
 import com.popman.arca.entity.Subject;
 import com.popman.arca.repository.DepartmentRepository;
@@ -33,6 +35,14 @@ public class SubjectServiceImplementation implements SubjectService{
 
     @Override
     public Subject createSubject(Subject subject) {
+        if(subjectRepository.existsByCode(subject.getCode())){
+            throw new RuntimeException("Subject with code : " + subject.getCode() + " already exists");
+        }
+
+        if(subjectRepository.existsByName(subject.getName())){
+            throw new RuntimeException("Subject with name : " + subject.getName() + " already exists");
+        }
+
         List<Department> attachedDepartments = new ArrayList<>();
 
         for(Department dept : subject.getListDepartments()){
@@ -70,5 +80,25 @@ public class SubjectServiceImplementation implements SubjectService{
             throw new RuntimeException("Subject not found by id: " + id);
         }
         subjectRepository.deleteById(id);
+    }
+
+    @Override
+    public SubjectResponse mapToResponse(Subject subject){
+
+        SubjectResponse response =  new SubjectResponse();
+        response.setId(subject.getId());
+        response.setCode(subject.getCode());
+        response.setName(subject.getName());
+        response.setAliases(subject.getAliases());
+
+        List<DepartmentResponse> departmentResponses = new ArrayList<>();
+        for(Department dept : subject.getListDepartments()){
+            DepartmentResponse deptRes = new DepartmentResponse();
+            deptRes.setId(dept.getId());
+            deptRes.setName(dept.getName());
+            departmentResponses.add(deptRes);
+        }
+        response.setDepartments(departmentResponses);
+        return response;
     }
 }

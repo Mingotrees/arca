@@ -1,5 +1,6 @@
 package com.popman.arca.service;
 
+import com.popman.arca.dto.subject.SubjectResponse;
 import com.popman.arca.entity.Subject;
 
 import java.util.List;
@@ -10,4 +11,6 @@ public interface SubjectService {
     Subject createSubject(Subject subject);
     Subject updateSubject(Long id, Subject updatedSubject);
     void deleteSubject(Long id);
+
+    SubjectResponse mapToResponse(Subject subject);
 }
