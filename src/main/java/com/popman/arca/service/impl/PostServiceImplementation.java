@@ -222,6 +222,13 @@ public class PostServiceImplementation implements PostService {
         return "";
     }
 
+    @Override
+    public List<PostResponse> getPendingPostsByDepartment(Long departmentId){
+        List<Post> posts = postRepository.getPendingPostsByDepartment(departmentId);
+        return posts.stream().map(this::mapToResponse).toList();
+    }
+
+
     private PostResponse mapToResponse(Post post) {
         PostResponse response = new PostResponse();
         response.setId(post.getId());

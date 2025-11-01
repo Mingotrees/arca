@@ -1,5 +1,6 @@
 package com.popman.arca.repository;
 
+import com.popman.arca.dto.Post.PostResponse;
 import com.popman.arca.entity.Post;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -41,4 +42,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             "ORDER BY p.version DESC LIMIT 1")
     Post findPreviousApprovedVersion(@Param("postId") Integer postId,
                                      @Param("currentVersion") Integer currentVersion);
+
+    @Query("SELECT p FROM Post p WHERE p.departmentId = :departmentId AND p.status = 'PENDING_APPROVAL'")
+    List<Post> getPendingPostsByDepartment(@Param("departmentId") Long departmentId);
 }
