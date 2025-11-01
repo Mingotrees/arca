@@ -29,7 +29,7 @@ public class DepartmentController {
         return ResponseEntity.ok(departmentService.getAllDepartments());
     }
 
-    @PostMapping("/add")
+    @PostMapping
     public ResponseEntity<DepartmentDetailResponse> createDepartment(@RequestBody DepartmentRequest request) {
         return ResponseEntity.ok(departmentService.createDepartment(request));
     }
