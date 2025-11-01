@@ -36,4 +36,7 @@ public interface PostService {
 
     //softDelete
     public String deletePost(Long postId);
+
+    //pending posts per department
+    public List<PostResponse> getPendingPostsByDepartment(Long departmentId);
 }
