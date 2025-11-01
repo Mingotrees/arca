@@ -4,6 +4,7 @@ import com.popman.arca.dto.Post.PostApprovalRequest;
 import com.popman.arca.dto.Post.PostRequest;
 import com.popman.arca.dto.Post.PostResponse;
 import com.popman.arca.dto.Post.PostUpdateRequest;
+import com.popman.arca.entity.Post;
 import com.popman.arca.service.PostService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -78,6 +79,11 @@ public class PostController {
         return ResponseEntity.ok(message);
     }
 
+    @GetMapping("/pending/department/{departmentId}")
+    public ResponseEntity<List<PostResponse>> getPendingPostsByDepartment(@PathVariable Long departmentId){
+        List<PostResponse> posts = postService.getPendingPostsByDepartment(departmentId);
+        return ResponseEntity.ok(posts);
+    }
     // === Version History ===
 
     @GetMapping("/history/{postId}")
