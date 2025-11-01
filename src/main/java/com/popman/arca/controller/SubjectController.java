@@ -1,4 +1,5 @@
 package com.popman.arca.controller;
+import com.popman.arca.dto.subject.SubjectRequest;
 import com.popman.arca.dto.subject.SubjectResponse;
 import com.popman.arca.entity.Subject;
 import com.popman.arca.service.SubjectService;
@@ -28,14 +29,14 @@ public class SubjectController {
     }
 
     @PostMapping
-    public SubjectResponse createSubject(@RequestBody Subject subject){
-       Subject created = subjectService.createSubject(subject);
+    public SubjectResponse createSubject(@RequestBody SubjectRequest request){
+       Subject created = subjectService.createSubject(request);
        return subjectService.mapToResponse(created);
     }
 
     @PutMapping("{subjectId}")
-    public SubjectResponse updateSubject(@PathVariable("subjectId") Long subjectId, @RequestBody Subject updatedSubject){
-        Subject updated = subjectService.updateSubject(subjectId, updatedSubject);
+    public SubjectResponse updateSubject(@PathVariable("subjectId") Long subjectId, @RequestBody SubjectRequest request){
+        Subject updated = subjectService.updateSubject(subjectId, request);
        return subjectService.mapToResponse(updated);
     }
 

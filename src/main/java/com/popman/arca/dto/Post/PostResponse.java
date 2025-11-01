@@ -1,5 +1,7 @@
 package com.popman.arca.dto.Post;
 
+import com.popman.arca.dto.subject.SubjectResponse;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;

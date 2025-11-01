@@ -5,6 +5,7 @@ import com.popman.arca.dto.Post.PostApprovalRequest;
 import com.popman.arca.dto.Post.PostRequest;
 import com.popman.arca.dto.Post.PostResponse;
 import com.popman.arca.dto.Post.PostUpdateRequest;
+import com.popman.arca.dto.subject.SubjectResponse;
 import com.popman.arca.entity.Department;
 import com.popman.arca.entity.Post;
 import com.popman.arca.entity.Subject;
@@ -85,11 +86,11 @@ public class PostServiceImplementation implements PostService {
         post.setUpdatedAt(LocalDateTime.now());
         post.setCreatedAt(LocalDateTime.now());
 
-        if(request.getSubjectId() != null && !request.getSubjectId().isEmpty()){
+        if(request.getPostTags() != null && !request.getPostTags().isEmpty()){
 
-            Set<Subject> subjects = new HashSet<>(subjectRepository.findSubjectByIdsAndDepartment(request.getSubjectId(), request.getDepartmentId()));
+            Set<Subject> subjects = new HashSet<>(subjectRepository.findSubjectByIdsAndDepartment(request.getPostTags(), request.getDepartmentId()));
 
-            if(subjects.size() != request.getSubjectId().size()){
+            if(subjects.size() != request.getPostTags().size()){
                 throw new RuntimeException("Some subjects do not belong to the department id " + request.getDepartmentId());
             }
             post.setSubjects(subjects);
@@ -232,6 +233,9 @@ public class PostServiceImplementation implements PostService {
         response.setIsLatestVersion(post.getIsLatestVersion());
         response.setCreatedAt(post.getCreatedAt());
         response.setUpdatedAt(post.getUpdatedAt());
+
+        List<String> tags = post.getSubjects().stream().map(Subject::getName).toList();
+        response.setPostTags(tags);
 
         if (post.getUser() != null) {
             response.setUserId(post.getUser().getId());

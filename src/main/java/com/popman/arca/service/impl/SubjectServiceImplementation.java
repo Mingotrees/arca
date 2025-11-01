@@ -1,5 +1,6 @@
 package com.popman.arca.service.impl;
 import com.popman.arca.dto.department.DepartmentResponse;
+import com.popman.arca.dto.subject.SubjectRequest;
 import com.popman.arca.dto.subject.SubjectResponse;
 import com.popman.arca.entity.Department;
 import com.popman.arca.entity.Subject;
@@ -34,38 +35,40 @@ public class SubjectServiceImplementation implements SubjectService{
     }
 
     @Override
-    public Subject createSubject(Subject subject) {
-        if(subjectRepository.existsByCode(subject.getCode())){
-            throw new RuntimeException("Subject with code : " + subject.getCode() + " already exists");
+    public Subject createSubject(SubjectRequest request) {
+        if(subjectRepository.existsByCode(request.getCode())){
+            throw new RuntimeException("Subject with code : " + request.getCode() + " already exists");
         }
 
-        if(subjectRepository.existsByName(subject.getName())){
-            throw new RuntimeException("Subject with name : " + subject.getName() + " already exists");
+        if(subjectRepository.existsByName(request.getName())){
+            throw new RuntimeException("Subject with name : " + request.getName() + " already exists");
         }
+        Subject subject = new Subject();
+        subject.setCode(request.getCode());
+        subject.setName(request.getName());
+        subject.setAliases(request.getAliases());
 
-        List<Department> attachedDepartments = new ArrayList<>();
-
-        for(Department dept : subject.getListDepartments()){
-            Department existingDep = departmentRepository.findById(dept.getId()).orElseThrow(() -> new RuntimeException("Department not found: " + dept.getId()));
-            attachedDepartments.add(existingDep);
-        }
+        List<Department> attachedDepartments = request.getDepartmentIds().stream()
+                .map(id -> departmentRepository.findById(id)
+                        .orElseThrow(() -> new RuntimeException("Department not found with id: " + id)))
+                .toList();
 
         subject.setListDepartments(attachedDepartments);
         return subjectRepository.save(subject);
     }
 
     @Override
-    public Subject updateSubject(Long id, Subject updatedSubject) {
+    public Subject updateSubject(Long id, SubjectRequest request) {
         Subject existingSubject = getSubjectById(id);
 
-        existingSubject.setCode(updatedSubject.getCode());
-        existingSubject.setName(updatedSubject.getName());
-        existingSubject.setAliases(updatedSubject.getAliases());
+        existingSubject.setCode(request.getCode());
+        existingSubject.setName(request.getName());
+        existingSubject.setAliases(request.getAliases());
 
         List<Department> attachedDepartments = new ArrayList<>();
-        for (Department dept : updatedSubject.getListDepartments()) {
-            Department existingDep = departmentRepository.findById(dept.getId())
-                    .orElseThrow(() -> new RuntimeException("Department not found: " + dept.getId()));
+        for (Long deptId : request.getDepartmentIds()) {
+            Department existingDep = departmentRepository.findById(deptId)
+                    .orElseThrow(() -> new RuntimeException("Department not found: " + deptId));
             attachedDepartments.add(existingDep);
         }
 
