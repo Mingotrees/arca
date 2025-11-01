@@ -97,7 +97,7 @@ public class PostServiceImplementation implements PostService {
         }
         postRepository.save(post);
 
-        return "Post created successfully with Id" + post.getId() + ". Awaiting admin approval";
+        return "Post created successfully with Id " + post.getId() + ". Awaiting admin approval";
     }
 
     @Override

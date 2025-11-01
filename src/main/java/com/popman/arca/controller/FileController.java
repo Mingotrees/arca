@@ -1,5 +1,6 @@
 package com.popman.arca.controller;
 
+import com.popman.arca.dto.file.FileUploadResponse;
 import com.popman.arca.entity.File;
 import com.popman.arca.service.FileService;
 import org.springframework.core.io.Resource;
@@ -15,17 +16,43 @@ import java.io.IOException;
 @RequestMapping("/api/files")
 public class FileController {
 
+
     private final FileService fileService;
 
     public FileController(FileService fileService){
         this.fileService = fileService;
     }
 
-    @PostMapping("/upload")
-    public ResponseEntity<File> uploadFile(@RequestParam("file")MultipartFile file, @RequestParam("userId")Long userId, @RequestParam("postId")Long postId) throws IOException {
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<FileUploadResponse> uploadFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("user_id") Long userId,
+            @RequestParam("post_id") Long postId) throws IOException {
+
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("File must not be null or empty");
+        }
+
+        if (userId == null || postId == null) {
+            throw new IllegalArgumentException("userId and postId must not be null");
+        }
+
+        System.out.println("userId=" + userId + ", postId=" + postId);
+
         File savedFile = fileService.uploadFile(file, userId, postId);
 
-        return ResponseEntity.ok(savedFile);
+        FileUploadResponse response = new FileUploadResponse(
+                savedFile.getId(),
+                savedFile.getFileName(),
+                savedFile.getFileType(),
+                savedFile.getFileSize(),
+                savedFile.getFilePath(),
+                savedFile.getUser().getId(),
+                savedFile.getPost().getId(),
+                "File uploaded successfully"
+        );
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/download/{id}")
@@ -33,11 +60,28 @@ public class FileController {
         Resource fileResource = fileService.downloadFile(id);
         File fileEntity = fileService.getFile(id).orElseThrow(()-> new IOException("File metadata not found"));
 
-        return ResponseEntity.ok().contentType(MediaType.parseMediaType(fileEntity.getFileType())).header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\"" + fileEntity.getFileName() + "\"").body(fileResource);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(fileEntity.getFileType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\"" + fileEntity.getFileName() + "\"").body(fileResource);
     }
+
     @GetMapping("/{id}")
-    public ResponseEntity<File> getFileInfo(@PathVariable Long id){
-        return fileService.getFile(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<FileUploadResponse> getFileInfo(@PathVariable Long id) {
+        return fileService.getFile(id)
+                .map(file -> {
+                    FileUploadResponse response = new FileUploadResponse(
+                            file.getId(),
+                            file.getFileName(),
+                            file.getFileType(),
+                            file.getFileSize(),
+                            file.getFilePath(),
+                            file.getUser().getId(),
+                            file.getPost().getId(),
+                            "File info retrieved successfully"
+                    );
+                    return ResponseEntity.ok(response);
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
 }
