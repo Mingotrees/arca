@@ -2,8 +2,15 @@ package com.popman.arca.service.impl;
 
 
 import com.popman.arca.entity.File;
+import com.popman.arca.entity.Post;
+import com.popman.arca.entity.User;
 import com.popman.arca.repository.FileRepository;
+import com.popman.arca.repository.PostRepository;
+import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.FileService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -17,7 +24,13 @@ import java.util.Optional;
 @Service
 public class FileServiceImplementation implements FileService {
 
+    private static final Logger logger = LoggerFactory.getLogger(FileServiceImplementation.class);
     private final FileRepository fileRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private PostRepository postRepository;
 
     @Value("${file.upload-dir}")
     private String uploadDir;
@@ -31,21 +44,37 @@ public class FileServiceImplementation implements FileService {
     public File uploadFile(MultipartFile file, Long userId, Long postId) throws IOException {
         Files.createDirectories(Paths.get(uploadDir));
 
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with id " + userId));
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found with id " + postId));
 
         String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
         Path filePath = Paths.get(uploadDir, fileName);
 
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
         File fileEntity = new File();
-
         fileEntity.setFileName(fileName);
         fileEntity.setFilePath(filePath.toString());
         fileEntity.setFileType(file.getContentType());
         fileEntity.setFileSize(file.getSize());
+        fileEntity.setPost(post);
+        fileEntity.setUser(user);
 
+        File savedFile;
+        try {
+            savedFile = fileRepository.save(fileEntity);
+        } catch (RuntimeException e) {
+            throw new RuntimeException("Database save failed: " + e.getMessage(), e);
+        }
 
-        return fileRepository.save(fileEntity);
+        try {
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            fileRepository.delete(savedFile);
+            throw new IOException("Failed to write file to storage. Database record rolled back.", e);
+        }
+
+        return savedFile;
     }
 
     @Override
@@ -67,3 +96,5 @@ public class FileServiceImplementation implements FileService {
         return fileRepository.findById(id);
     }
 }
+
+

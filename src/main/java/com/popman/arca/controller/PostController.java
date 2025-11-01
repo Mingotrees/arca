@@ -86,9 +86,12 @@ public class PostController {
         return ResponseEntity.ok(versions);
     }
 
+
+
 //    @GetMapping("/latest/{postId}")
 //    public ResponseEntity<PostResponse> getLatestVersion(@PathVariable("postId") Integer postId) {
 //        PostResponse latestVersion = postService.getLatestVersion(postId);
 //        return ResponseEntity.ok(latestVersion);
 //    }
 }
+
