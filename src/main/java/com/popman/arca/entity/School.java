@@ -5,7 +5,9 @@ import jakarta.persistence.*;
 import java.util.List;
 
 @Entity
-@Table(name = "school")
+@Table(name = "school", indexes = {
+        @Index(name = "idx_school_id", columnList = "id"),
+})
 public class School {
 
  @Id
