@@ -10,7 +10,14 @@ import java.time.LocalDateTime;
 @Entity
 @SQLDelete(sql = "UPDATE users SET is_deleted = true, deleted_at = NOW() WHERE id = ?")
 @SQLRestriction("is_deleted = false")
-@Table(name="users")
+@Table(name = "users", indexes = {
+//        @Index(name = "idx_first_name", columnList = "first_name"),
+//        @Index(name = "idx_last_name", columnList = "last_name"),
+//        @Index(name = "idx_full_name", columnList = "first_name, last_name"),
+        @Index(name = "idx_user_id", columnList = "id"),
+        @Index(name = "idx_role", columnList = "role"),
+        @Index(name = "idx_deleted", columnList = "is_deleted")
+})
 public class User {
 
     @Id

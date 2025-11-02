@@ -12,6 +12,8 @@ import java.util.Set;
 @Table(name="subjects", uniqueConstraints = {
         @UniqueConstraint(columnNames = "code"),
         @UniqueConstraint(columnNames = "name")
+}, indexes = {
+        @Index(name = "idx_subject_id", columnList = "id")
 })
 public class Subject {
 
