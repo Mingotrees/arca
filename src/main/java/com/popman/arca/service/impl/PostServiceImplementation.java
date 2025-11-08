@@ -1,11 +1,10 @@
 package com.popman.arca.service.impl;
 
 
-import com.popman.arca.dto.Post.PostApprovalRequest;
-import com.popman.arca.dto.Post.PostRequest;
-import com.popman.arca.dto.Post.PostResponse;
-import com.popman.arca.dto.Post.PostUpdateRequest;
-import com.popman.arca.dto.subject.SubjectResponse;
+import com.popman.arca.dto.post.PostApprovalRequest;
+import com.popman.arca.dto.post.PostRequest;
+import com.popman.arca.dto.post.PostResponse;
+import com.popman.arca.dto.post.PostUpdateRequest;
 import com.popman.arca.entity.Department;
 import com.popman.arca.entity.Post;
 import com.popman.arca.entity.Subject;

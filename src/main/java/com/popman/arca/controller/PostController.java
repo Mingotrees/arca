@@ -1,10 +1,9 @@
 package com.popman.arca.controller;
 
-import com.popman.arca.dto.Post.PostApprovalRequest;
-import com.popman.arca.dto.Post.PostRequest;
-import com.popman.arca.dto.Post.PostResponse;
-import com.popman.arca.dto.Post.PostUpdateRequest;
-import com.popman.arca.entity.Post;
+import com.popman.arca.dto.post.PostApprovalRequest;
+import com.popman.arca.dto.post.PostRequest;
+import com.popman.arca.dto.post.PostResponse;
+import com.popman.arca.dto.post.PostUpdateRequest;
 import com.popman.arca.service.PostService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;

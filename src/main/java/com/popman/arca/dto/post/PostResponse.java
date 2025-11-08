@@ -1,8 +1,5 @@
-package com.popman.arca.dto.Post;
+package com.popman.arca.dto.post;
 
-import com.popman.arca.dto.subject.SubjectResponse;
-
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -18,16 +15,60 @@ public class PostResponse {
     private String lastName;
     private Long departmentId;
     private String departmentName;
-    //wala pani kay wala pay table nahimo for it
+
     private List<String> postTags;
     private String rejectionReason;
     private Boolean IsLatestVersion;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    private Integer upvoteCount;
+    private Integer downvoteCount;
+    private Integer totalVotes;
+    private String currentUserVote;
+
 
     public PostResponse() {}
 
+    public Boolean getLatestVersion() {
+        return IsLatestVersion;
+    }
+
+    public void setLatestVersion(Boolean latestVersion) {
+        IsLatestVersion = latestVersion;
+    }
+
+    public Integer getUpvoteCount() {
+        return upvoteCount;
+    }
+
+    public void setUpvoteCount(Integer upvoteCount) {
+        this.upvoteCount = upvoteCount;
+    }
+
+    public Integer getDownvoteCount() {
+        return downvoteCount;
+    }
+
+    public void setDownvoteCount(Integer downvoteCount) {
+        this.downvoteCount = downvoteCount;
+    }
+
+    public Integer getTotalVotes() {
+        return totalVotes;
+    }
+
+    public void setTotalVotes(Integer totalVotes) {
+        this.totalVotes = totalVotes;
+    }
+
+    public String getCurrentUserVote() {
+        return currentUserVote;
+    }
+
+    public void setCurrentUserVote(String currentUserVote) {
+        this.currentUserVote = currentUserVote;
+    }
 
     public Long getId() {
         return id;

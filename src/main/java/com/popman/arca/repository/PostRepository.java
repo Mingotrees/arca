@@ -1,6 +1,5 @@
 package com.popman.arca.repository;
 
-import com.popman.arca.dto.Post.PostResponse;
 import com.popman.arca.entity.Post;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -36,7 +35,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     void updateIsLatestVersionByPostId(@Param("postId") Integer postId,
                                        @Param("isLatest") Boolean isLatest);
 
-    // Get the previous approved version
     @Query("SELECT p FROM Post p WHERE p.post_id = :postId " +
             "AND p.version < :currentVersion AND p.status = 'APPROVED' " +
             "ORDER BY p.version DESC LIMIT 1")
