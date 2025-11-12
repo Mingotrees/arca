@@ -103,42 +103,48 @@ public class PostServiceImplementation implements PostService {
     @Override
     @Transactional
     public String updatePost(PostUpdateRequest updateRequest, Long postId) {
-        // Find the current post
         Post currentPost = postRepository.findById(postId)
                 .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
 
-        // Validate that the post is approved (only approved posts can be updated)
         if (!"APPROVED".equals(currentPost.getStatus())) {
             throw new RuntimeException("Only approved posts can be updated. Current status: " + currentPost.getStatus());
         }
 
-        // Get the maximum version for this post_id
         Integer maxVersion = postRepository.findMaxVersionByPostId(currentPost.getPost_id());
-
-        // Mark all versions of this post as not latest
         postRepository.updateIsLatestVersionByPostId(currentPost.getPost_id(), false);
 
-        // Create new version
         Post newVersion = new Post();
-        newVersion.setPost_id(currentPost.getPost_id()); // Same post_id group
-        newVersion.setVersion(maxVersion + 1); // Increment version
+        newVersion.setPost_id(currentPost.getPost_id());
+        newVersion.setVersion(maxVersion + 1);
         newVersion.setTitle(updateRequest.getTitle() != null ? updateRequest.getTitle() : currentPost.getTitle());
         newVersion.setContent(updateRequest.getContent() != null ? updateRequest.getContent() : currentPost.getContent());
-        newVersion.setStatus("PENDING_APPROVAL"); // Requires admin approval
+        newVersion.setStatus("PENDING_APPROVAL");
         newVersion.setUserId(currentPost.getUserId());
         newVersion.setDepartmentId(currentPost.getDepartmentId());
         newVersion.setIsLatestVersion(true);
         newVersion.setCreatedAt(LocalDateTime.now());
         newVersion.setUpdatedAt(LocalDateTime.now());
 
+        if (updateRequest.getPostTags() != null && !updateRequest.getPostTags().isEmpty()) {
+            Set<Subject> subjects = new HashSet<>(
+                    subjectRepository.findSubjectByIdsAndDepartment(
+                            updateRequest.getPostTags(),
+                            currentPost.getDepartmentId() // ✅ FIXED: use existing department
+                    )
+            );
+
+            if (subjects.size() != updateRequest.getPostTags().size()) {
+                throw new RuntimeException("Some subjects do not belong to the department id " + currentPost.getDepartmentId());
+            }
+
+            newVersion.setSubjects(subjects);
+        } else {
+            newVersion.setSubjects(currentPost.getSubjects());
+        }
+
         postRepository.save(newVersion);
 
-//        // TODO: Handle postTags update if provided
-//        if (updateRequest.getPostTags() != null) {
-//            // Update post tags logic here
-//        }
-
-        return "Post updated successfully. Version " + newVersion.getVersion() + " is pending approval.";
+        return "Post update submitted successfully. Version " + newVersion.getVersion() + " is pending admin approval.";
     }
 
     @Override
@@ -161,10 +167,8 @@ public class PostServiceImplementation implements PostService {
         }
 
         if (approvalRequest.getApproved()) {
-            // Approve the post
             post.setStatus("APPROVED");
 
-            // If this is a version > 1 (an update), handle the previous approved version
             if (post.getVersion() > 1) {
                 Post previousApproved = postRepository
                         .findPreviousApprovedVersion(post.getPost_id(), post.getVersion());
@@ -182,7 +186,6 @@ public class PostServiceImplementation implements PostService {
             return "Post approved successfully. Now visible to users.";
 
         } else {
-            // Reject the post
             post.setStatus("REJECTED");
             post.setIsLatestVersion(false);
 
@@ -190,7 +193,6 @@ public class PostServiceImplementation implements PostService {
                 post.setRejectionReason(approvalRequest.getRejectionReason());
             }
 
-            // If rejecting an update, restore the previous approved version as latest
             if (post.getVersion() > 1) {
                 Post previousApproved = postRepository
                         .findPreviousApprovedVersion(post.getPost_id(), post.getVersion());
