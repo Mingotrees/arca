@@ -83,6 +83,7 @@ public class PostController {
         List<PostResponse> posts = postService.getPendingPostsByDepartment(departmentId);
         return ResponseEntity.ok(posts);
     }
+
     // === Version History ===
 
     @GetMapping("/history/{postId}")

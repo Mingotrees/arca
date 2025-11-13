@@ -41,11 +41,21 @@ public class JwtFilter extends OncePerRequestFilter {
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = context.getBean(MyUserDetailsService.class).loadUserByUsername(email);
 
+            // 🔍 DEBUG: Check what authorities were loaded
+            System.out.println("===== JWT FILTER DEBUG =====");
+            System.out.println("📧 Email from token: " + email);
+            System.out.println("🔑 User authorities: " + userDetails.getAuthorities());
+            System.out.println("📍 Requested endpoint: " + request.getRequestURI());
+
             if (jwtService.validateToken(token, userDetails)) {
+                System.out.println("✅ Token is VALID");
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
+                System.out.println("✅ Authentication set with authorities: " + authToken.getAuthorities());
+            }else{
+                System.out.println("❌ Token is INVALID");
             }
         }
 

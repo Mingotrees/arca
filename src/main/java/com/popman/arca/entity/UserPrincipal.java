@@ -69,6 +69,6 @@ public class UserPrincipal implements UserDetails {
 
     // Helper method to check if user is admin
     public boolean isAdmin() {
-        return user.getRoles().contains("ROLE_ADMIN");
+        return user.getRoles().contains("ADMIN");
     }
 }
