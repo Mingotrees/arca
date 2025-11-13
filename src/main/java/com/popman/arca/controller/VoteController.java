@@ -2,9 +2,10 @@ package com.popman.arca.controller;
 
 import com.popman.arca.dto.vote.VoteRequest;
 import com.popman.arca.dto.vote.VoteResponse;
+import com.popman.arca.entity.UserPrincipal;
 import com.popman.arca.service.VoteService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,8 +19,11 @@ public class VoteController {
     }
 
     @PostMapping
-    public ResponseEntity<VoteResponse> vote(@RequestBody VoteRequest request,
-                                                @RequestParam Long userId) {
+    public ResponseEntity<VoteResponse> vote(
+            @RequestBody VoteRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        Long userId = userPrincipal.getId();
         VoteResponse response = voteService.createOrUpdateVote(request, userId);
 
         if (response == null) {
@@ -30,15 +34,21 @@ public class VoteController {
     }
 
     @DeleteMapping("/{postId}")
-    public ResponseEntity<Void> removeVote(@PathVariable Long postId,
-                                           @RequestParam Long userId) {
+    public ResponseEntity<Void> removeVote(
+            @PathVariable Long postId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        Long userId = userPrincipal.getId();
         voteService.removeVote(postId, userId);
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/{postId}/user/{userId}")
-    public ResponseEntity<VoteResponse> getUserVote(@PathVariable Long postId,
-                                                       @PathVariable Long userId) {
+    @GetMapping("/{postId}/my-vote")
+    public ResponseEntity<VoteResponse> getMyVote(
+            @PathVariable Long postId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        Long userId = userPrincipal.getId();
         VoteResponse vote = voteService.getUserVoteForPost(postId, userId);
         return ResponseEntity.ok(vote);
     }

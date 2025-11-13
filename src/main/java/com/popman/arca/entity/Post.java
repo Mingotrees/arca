@@ -2,7 +2,9 @@ package com.popman.arca.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Entity
@@ -62,9 +64,26 @@ public class Post {
     @JoinTable(name = "post_tags", joinColumns = @JoinColumn(name = "post_id"), inverseJoinColumns = @JoinColumn(name = "subject_id"))
     private Set<Subject> subjects = new HashSet<>();
 
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<File> files = new ArrayList<>();
 
     public Post() {}
 
+    public Boolean getLatestVersion() {
+        return isLatestVersion;
+    }
+
+    public void setLatestVersion(Boolean latestVersion) {
+        isLatestVersion = latestVersion;
+    }
+
+    public List<File> getFiles() {
+        return files;
+    }
+
+    public void setFiles(List<File> files) {
+        this.files = files;
+    }
 
     public Long getId() {
         return id;

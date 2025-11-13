@@ -1,6 +1,7 @@
 package com.popman.arca.service.impl;
 
 
+import com.popman.arca.dto.file.FileResponse;
 import com.popman.arca.dto.post.PostApprovalRequest;
 import com.popman.arca.dto.post.PostRequest;
 import com.popman.arca.dto.post.PostResponse;
@@ -35,6 +36,9 @@ public class PostServiceImplementation implements PostService {
 
     @Autowired
     private DepartmentRepository departmentRepository;
+
+    @Autowired
+    private VoteServiceImplementation voteServiceImplementation;
 
     @Autowired
     private SubjectRepository subjectRepository;
@@ -260,6 +264,30 @@ public class PostServiceImplementation implements PostService {
 
         if (post.getRejectionReason() != null) {
             response.setRejectionReason(post.getRejectionReason());
+        }
+
+        // ✅ Only add vote counts (no current user vote)
+        try {
+            Integer upvotes = voteServiceImplementation.getUpvoteCount(post.getId());
+            Integer downvotes = voteServiceImplementation.getDownvoteCount(post.getId());
+
+            response.setUpvoteCount(upvotes);
+            response.setDownvoteCount(downvotes);
+        } catch (Exception e) {
+            response.setUpvoteCount(0);
+            response.setDownvoteCount(0);
+        }
+
+        if (post.getFiles() != null && !post.getFiles().isEmpty()) {
+            List<FileResponse> fileResponses = post.getFiles().stream()
+                    .map(file -> new FileResponse(
+                            file.getId(),
+                            file.getFileName(),
+                            file.getFileType(),
+                            file.getFileSize()
+                    ))
+                    .toList();
+            response.setFiles(fileResponses);
         }
 
         return response;

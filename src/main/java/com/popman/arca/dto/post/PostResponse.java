@@ -1,5 +1,7 @@
 package com.popman.arca.dto.post;
 
+import com.popman.arca.dto.file.FileResponse;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -24,9 +26,7 @@ public class PostResponse {
 
     private Integer upvoteCount;
     private Integer downvoteCount;
-    private Integer totalVotes;
-    private String currentUserVote;
-
+    private List<FileResponse> files;
 
     public PostResponse() {}
 
@@ -52,22 +52,6 @@ public class PostResponse {
 
     public void setDownvoteCount(Integer downvoteCount) {
         this.downvoteCount = downvoteCount;
-    }
-
-    public Integer getTotalVotes() {
-        return totalVotes;
-    }
-
-    public void setTotalVotes(Integer totalVotes) {
-        this.totalVotes = totalVotes;
-    }
-
-    public String getCurrentUserVote() {
-        return currentUserVote;
-    }
-
-    public void setCurrentUserVote(String currentUserVote) {
-        this.currentUserVote = currentUserVote;
     }
 
     public Long getId() {
@@ -196,5 +180,13 @@ public class PostResponse {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public List<FileResponse> getFiles() {
+        return files;
+    }
+
+    public void setFiles(List<FileResponse> files) {
+        this.files = files;
     }
 }
