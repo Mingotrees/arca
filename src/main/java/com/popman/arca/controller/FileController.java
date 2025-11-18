@@ -1,6 +1,7 @@
 package com.popman.arca.controller;
 
 import com.popman.arca.dto.file.FileUploadResponse;
+import com.popman.arca.dto.file.MultipleFileUploadResponse;
 import com.popman.arca.entity.File;
 import com.popman.arca.service.FileService;
 import org.springframework.core.io.Resource;
@@ -11,6 +12,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/files")
@@ -24,32 +28,53 @@ public class FileController {
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<FileUploadResponse> uploadFile(
-            @RequestParam("file") MultipartFile file,
+    public ResponseEntity<MultipleFileUploadResponse> uploadFile(
+            @RequestParam("file") List<MultipartFile> files,
             @RequestParam("user_id") Long userId,
             @RequestParam("post_id") Long postId) throws IOException {
 
-        if (file == null || file.isEmpty()) {
+        if (files == null || files.isEmpty()) {
             throw new IllegalArgumentException("File must not be null or empty");
+        }
+
+        if (files.size() > 3){
+            throw new IllegalArgumentException("Only maximum of 3 files allowed");
         }
 
         if (userId == null || postId == null) {
             throw new IllegalArgumentException("userId and postId must not be null");
         }
 
-        System.out.println("userId=" + userId + ", postId=" + postId);
+        List<File> savedFiles = new ArrayList<>();
 
-        File savedFile = fileService.uploadFile(file, userId, postId);
+        for(MultipartFile file: files){
+            String contentType = file.getContentType();
+            if(contentType.equals("image/jpeg") ||
+                    contentType.equals("image/png") ||
+                    contentType.equals("application/pdf")){
+                File savedFile = fileService.uploadFile(file, userId, postId);
+                savedFiles.add(savedFile);
+            }else{
+                throw new IllegalArgumentException("Only image/jpeg or image/png or application/pdf");
+            }
 
-        FileUploadResponse response = new FileUploadResponse(
-                savedFile.getId(),
-                savedFile.getFileName(),
-                savedFile.getFileType(),
-                savedFile.getFileSize(),
-                savedFile.getFilePath(),
-                savedFile.getUser().getId(),
-                savedFile.getPost().getId(),
-                "File uploaded successfully"
+        }
+
+        List<FileUploadResponse> fileResponses = savedFiles.stream()
+                .map(savedFile -> new FileUploadResponse(
+                        savedFile.getId(),
+                        savedFile.getFileName(),
+                        savedFile.getFileType(),
+                        savedFile.getFileSize(),
+                        savedFile.getFilePath(),
+                        savedFile.getUser().getId(),
+                        savedFile.getPost().getId(),
+                        "File uploaded successfully"
+                )).collect(Collectors.toList());
+
+        MultipleFileUploadResponse response = new MultipleFileUploadResponse(
+                fileResponses,
+                fileResponses.size() +  " files uploaded successfully"
         );
 
         return ResponseEntity.ok(response);

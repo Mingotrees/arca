@@ -43,7 +43,7 @@ public class PostController {
     }
 
     @PostMapping
-    public ResponseEntity<String> createPost(@Valid @RequestBody PostRequest newPost, ) {
+    public ResponseEntity<String> createPost(@Valid @RequestBody PostRequest newPost) {
         String message = postService.createPost(newPost);
         return ResponseEntity.status(HttpStatus.CREATED).body(message);
     }
@@ -62,7 +62,6 @@ public class PostController {
         return ResponseEntity.ok(message);
     }
 
-    // === Admin Operations ===
 
     @GetMapping("/pending")
     public ResponseEntity<List<PostResponse>> getAllPendingApprovalPosts() {

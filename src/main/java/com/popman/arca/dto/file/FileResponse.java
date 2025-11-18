@@ -17,7 +17,6 @@ public class FileResponse {
         this.downloadUrl = "/api/files/" + id + "/download";
     }
 
-    // Getters and setters
     public Long getId() {
         return id;
     }

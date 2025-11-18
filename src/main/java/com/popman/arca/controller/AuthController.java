@@ -43,17 +43,14 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody User user) {
         try {
             String result = userService.createUser(user);
-            logger.info("User registered successfully: {}", user.getEmail());
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     new RegisterResponse(result, user.getEmail())
             );
         } catch (IllegalArgumentException e) {
-            logger.warn("Registration failed: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(new ErrorResponse(e.getMessage()));
         } catch (Exception e) {
-            logger.error("Unexpected error during registration: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("Registration failed: " + e.getMessage()));
         }
@@ -76,7 +73,6 @@ public class AuthController {
                 // Generate refresh token
                 RefreshToken refreshToken = refreshTokenService.createRefreshToken(loginRequest.getEmail());
 
-                logger.info("User logged in successfully: {}", loginRequest.getEmail());
 
                 // Return both tokens
                 AuthResponse response = new AuthResponse(
@@ -87,16 +83,13 @@ public class AuthController {
 
                 return ResponseEntity.ok(response);
             } else {
-                logger.warn("Authentication failed for user: {}", loginRequest.getEmail());
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(new ErrorResponse("Authentication failed"));
             }
         } catch (BadCredentialsException e) {
-            logger.warn("Invalid credentials for user: {}", loginRequest.getEmail());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new ErrorResponse("Invalid email or password"));
         } catch (Exception e) {
-            logger.error("Error during login: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("Login failed: " + e.getMessage()));
         }
@@ -147,7 +140,6 @@ public class AuthController {
         }
     }
 
-    // Inner classes for structured responses
     private static class RegisterResponse {
         private String message;
         private String email;

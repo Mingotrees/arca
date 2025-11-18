@@ -250,14 +250,14 @@ public class PostServiceImplementation implements PostService {
         if (post.getUser() != null) {
             response.setUserId(post.getUser().getId());
             response.setFirstName(post.getUser().getFirstName());
-            response.setLastName(post.getUser().getLastName());// Adjust based on your User entity
+            response.setLastName(post.getUser().getLastName());
         } else {
             response.setUserId(post.getUserId());
         }
 
         if (post.getDepartment() != null) {
             response.setDepartmentId(post.getDepartment().getId());
-            response.setDepartmentName(post.getDepartment().getName()); // Adjust based on your Department entity
+            response.setDepartmentName(post.getDepartment().getName());
         } else {
             response.setDepartmentId(post.getDepartmentId());
         }
@@ -266,7 +266,6 @@ public class PostServiceImplementation implements PostService {
             response.setRejectionReason(post.getRejectionReason());
         }
 
-        // ✅ Only add vote counts (no current user vote)
         try {
             Integer upvotes = voteServiceImplementation.getUpvoteCount(post.getId());
             Integer downvotes = voteServiceImplementation.getDownvoteCount(post.getId());
