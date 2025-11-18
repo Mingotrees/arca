@@ -5,17 +5,15 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
-
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @SQLDelete(sql = "UPDATE users SET is_deleted = true, deleted_at = NOW() WHERE id = ?")
 @SQLRestriction("is_deleted = false")
 @Table(name = "users", indexes = {
-//        @Index(name = "idx_first_name", columnList = "first_name"),
-//        @Index(name = "idx_last_name", columnList = "last_name"),
-//        @Index(name = "idx_full_name", columnList = "first_name, last_name"),
         @Index(name = "idx_user_id", columnList = "id"),
-        @Index(name = "idx_role", columnList = "role"),
+        @Index(name = "idx_email", columnList = "email"),  // Added - critical for login lookups
         @Index(name = "idx_deleted", columnList = "is_deleted")
 })
 public class User {
@@ -27,6 +25,8 @@ public class User {
     private String firstName;
     private String lastName;
     private String password;
+
+    @Column(unique = true, nullable = false)  // Email should be unique and required
     private String email;
 
     @Column(length = 24)
@@ -41,31 +41,57 @@ public class User {
     private boolean isDeleted = false;
     private LocalDateTime deletedAt;
 
-    //user and admin
-    private String role;
+    // Store multiple roles per user
+    // Uses a separate table: user_roles (user_id, role)
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            indexes = @Index(name = "idx_user_roles_user_id", columnList = "user_id")
+    )
+    @Column(name = "role")
+    private Set<String> roles;
 
-
-    public User(){
-
+    // Constructors
+    public User() {
+        this.roles = new HashSet<>();
     }
 
-    public User(Long id, String type, String firstName, String lastName, String password, String course, String department, String bio, String profilePicture) {
+    public User(Long id, String firstName, String lastName, String password,
+                String email, String course, String department, String bio,
+                String profilePicture) {
         this.id = id;
         this.firstName = firstName;
         this.lastName = lastName;
         this.password = password;
+        this.email = email;
         this.course = course;
         this.department = department;
         this.bio = bio;
         this.profilePicture = profilePicture;
+        this.roles = new HashSet<>();
     }
 
-    public String getRole() {
-        return role;
+    // Helper methods for managing roles
+    public void addRole(String role) {
+        this.roles.add(role);
     }
 
-    public void setRole(String role) {
-        this.role = role;
+    public void removeRole(String role) {
+        this.roles.remove(role);
+    }
+
+    public boolean hasRole(String role) {
+        return this.roles.contains(role);
+    }
+
+    // Getters and Setters
+    public Set<String> getRoles() {
+        return roles;
+    }
+
+    public void setRoles(Set<String> roles) {
+        this.roles = roles;
     }
 
     public boolean isDeleted() {
@@ -155,4 +181,5 @@ public class User {
     public void setProfilePicture(String profilePicture) {
         this.profilePicture = profilePicture;
     }
+
 }

@@ -5,9 +5,15 @@ import com.popman.arca.entity.User;
 import java.util.List;
 
 public interface UserService {
-    public User getUser(Long userId);
-    public List<User> getAllUser();
-    public String createUser(User user);
-    public String updateUser(User user);
-    public String deleteUser(Long userId);
+    User getUser(Long userId);
+    List<User> getAllUser();
+    String createUser(User user);
+    String updateUser(User user);
+    String deleteUser(Long userId);
+
+    String createAdmin(User user);
+    String promoteToAdmin(Long userId);
+    String demoteFromAdmin(Long userId);
+    String addRoleToUser(Long userId, String role);
+    String removeRoleFromUser(Long userId, String role);
 }

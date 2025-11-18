@@ -1,11 +1,11 @@
 package com.popman.arca.service.impl;
 
 
-import com.popman.arca.dto.Post.PostApprovalRequest;
-import com.popman.arca.dto.Post.PostRequest;
-import com.popman.arca.dto.Post.PostResponse;
-import com.popman.arca.dto.Post.PostUpdateRequest;
-import com.popman.arca.dto.subject.SubjectResponse;
+import com.popman.arca.dto.file.FileResponse;
+import com.popman.arca.dto.post.PostApprovalRequest;
+import com.popman.arca.dto.post.PostRequest;
+import com.popman.arca.dto.post.PostResponse;
+import com.popman.arca.dto.post.PostUpdateRequest;
 import com.popman.arca.entity.Department;
 import com.popman.arca.entity.Post;
 import com.popman.arca.entity.Subject;
@@ -36,6 +36,9 @@ public class PostServiceImplementation implements PostService {
 
     @Autowired
     private DepartmentRepository departmentRepository;
+
+    @Autowired
+    private VoteServiceImplementation voteServiceImplementation;
 
     @Autowired
     private SubjectRepository subjectRepository;
@@ -249,20 +252,43 @@ public class PostServiceImplementation implements PostService {
         if (post.getUser() != null) {
             response.setUserId(post.getUser().getId());
             response.setFirstName(post.getUser().getFirstName());
-            response.setLastName(post.getUser().getLastName());// Adjust based on your User entity
+            response.setLastName(post.getUser().getLastName());
         } else {
             response.setUserId(post.getUserId());
         }
 
         if (post.getDepartment() != null) {
             response.setDepartmentId(post.getDepartment().getId());
-            response.setDepartmentName(post.getDepartment().getName()); // Adjust based on your Department entity
+            response.setDepartmentName(post.getDepartment().getName());
         } else {
             response.setDepartmentId(post.getDepartmentId());
         }
 
         if (post.getRejectionReason() != null) {
             response.setRejectionReason(post.getRejectionReason());
+        }
+
+        try {
+            Integer upvotes = voteServiceImplementation.getUpvoteCount(post.getId());
+            Integer downvotes = voteServiceImplementation.getDownvoteCount(post.getId());
+
+            response.setUpvoteCount(upvotes);
+            response.setDownvoteCount(downvotes);
+        } catch (Exception e) {
+            response.setUpvoteCount(0);
+            response.setDownvoteCount(0);
+        }
+
+        if (post.getFiles() != null && !post.getFiles().isEmpty()) {
+            List<FileResponse> fileResponses = post.getFiles().stream()
+                    .map(file -> new FileResponse(
+                            file.getId(),
+                            file.getFileName(),
+                            file.getFileType(),
+                            file.getFileSize()
+                    ))
+                    .toList();
+            response.setFiles(fileResponses);
         }
 
         return response;
