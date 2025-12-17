@@ -1,7 +1,7 @@
 package com.popman.arca.controller;
 
-import com.popman.arca.dto.file.FileUploadResponse;
-import com.popman.arca.dto.file.MultipleFileUploadResponse;
+import com.popman.arca.dto.file.FileUploadRequest;
+import com.popman.arca.dto.file.MultipleFileUploadRequest;
 import com.popman.arca.entity.File;
 import com.popman.arca.service.FileService;
 import org.springframework.core.io.Resource;
@@ -28,7 +28,7 @@ public class FileController {
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<MultipleFileUploadResponse> uploadFile(
+    public ResponseEntity<MultipleFileUploadRequest> uploadFile(
             @RequestParam("file") List<MultipartFile> files,
             @RequestParam("user_id") Long userId,
             @RequestParam("post_id") Long postId) throws IOException {
@@ -60,8 +60,8 @@ public class FileController {
 
         }
 
-        List<FileUploadResponse> fileResponses = savedFiles.stream()
-                .map(savedFile -> new FileUploadResponse(
+        List<FileUploadRequest> fileResponses = savedFiles.stream()
+                .map(savedFile -> new FileUploadRequest(
                         savedFile.getId(),
                         savedFile.getFileName(),
                         savedFile.getFileType(),
@@ -72,7 +72,7 @@ public class FileController {
                         "File uploaded successfully"
                 )).collect(Collectors.toList());
 
-        MultipleFileUploadResponse response = new MultipleFileUploadResponse(
+        MultipleFileUploadRequest response = new MultipleFileUploadRequest(
                 fileResponses,
                 fileResponses.size() +  " files uploaded successfully"
         );
@@ -91,10 +91,10 @@ public class FileController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<FileUploadResponse> getFileInfo(@PathVariable Long id) {
+    public ResponseEntity<FileUploadRequest> getFileInfo(@PathVariable Long id) {
         return fileService.getFile(id)
                 .map(file -> {
-                    FileUploadResponse response = new FileUploadResponse(
+                    FileUploadRequest response = new FileUploadRequest(
                             file.getId(),
                             file.getFileName(),
                             file.getFileType(),
@@ -108,5 +108,7 @@ public class FileController {
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
+
+
 
 }

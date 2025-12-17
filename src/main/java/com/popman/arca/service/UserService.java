@@ -1,6 +1,7 @@
 package com.popman.arca.service;
 
 import com.popman.arca.entity.User;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -16,4 +17,6 @@ public interface UserService {
     String demoteFromAdmin(Long userId);
     String addRoleToUser(Long userId, String role);
     String removeRoleFromUser(Long userId, String role);
+
+    String updateProfilePicture(Long userId, MultipartFile file);
 }

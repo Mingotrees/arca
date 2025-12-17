@@ -1,6 +1,8 @@
 package com.popman.arca.controller;
 
 import com.popman.arca.entity.User;
+import com.popman.arca.entity.BannedEmail;
+import com.popman.arca.service.BannedEmailService;
 import com.popman.arca.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,9 +20,11 @@ public class AdminController {
 
     private static final Logger logger = LoggerFactory.getLogger(AdminController.class);
     private final UserService userService;
+    private final BannedEmailService bannedEmailService;
 
-    public AdminController(UserService userService) {
+    public AdminController(UserService userService, BannedEmailService bannedEmailService) {
         this.userService = userService;
+        this.bannedEmailService = bannedEmailService;
     }
 
     // Get all users (admin only)
@@ -160,6 +164,46 @@ public class AdminController {
         }
     }
 
+    // Banned email management
+    @GetMapping("/banned-emails")
+    public ResponseEntity<?> listBannedEmails() {
+        try {
+            return ResponseEntity.ok(bannedEmailService.listAll());
+        } catch (Exception e) {
+            logger.error("Error listing banned emails: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Failed to list banned emails"));
+        }
+    }
+
+    @PostMapping("/banned-emails")
+    public ResponseEntity<?> banEmail(@RequestBody BanEmailRequest request) {
+        try {
+            String msg = bannedEmailService.ban(request.getEmail(), request.getReason());
+            return ResponseEntity.status(HttpStatus.CREATED).body(new SuccessResponse(msg));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error banning email: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Failed to ban email"));
+        }
+    }
+
+    @DeleteMapping("/banned-emails/{email}")
+    public ResponseEntity<?> unbanEmail(@PathVariable String email) {
+        try {
+            String msg = bannedEmailService.unban(email);
+            return ResponseEntity.ok(new SuccessResponse(msg));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error unbanning email: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Failed to unban email"));
+        }
+    }
+
     // DTOs
     private static class RoleRequest {
         private String role;
@@ -170,6 +214,27 @@ public class AdminController {
 
         public void setRole(String role) {
             this.role = role;
+        }
+    }
+
+    private static class BanEmailRequest {
+        private String email;
+        private String reason;
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+
+        public void setReason(String reason) {
+            this.reason = reason;
         }
     }
 

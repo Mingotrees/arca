@@ -34,6 +34,7 @@ public class SubjectController {
        return subjectService.mapToResponse(created);
     }
 
+
     @PutMapping("{subjectId}")
     public SubjectResponse updateSubject(@PathVariable("subjectId") Long subjectId, @RequestBody SubjectRequest request){
         Subject updated = subjectService.updateSubject(subjectId, request);

@@ -6,9 +6,16 @@ import com.popman.arca.service.UserService;
 import jakarta.transaction.Transactional;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -20,6 +27,9 @@ public class UserServiceImplementation implements UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserServiceImplementation.class);
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+
+    @Value("${file.upload-dir}")
+    private String uploadDir;
 
     public UserServiceImplementation(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
@@ -244,6 +254,69 @@ public class UserServiceImplementation implements UserService {
             logger.error("Unexpected error removing role: {}", e.getMessage());
             throw new RuntimeException("Failed to remove role", e);
         }
+    }
+
+    @Override
+    public String updateProfilePicture(Long userId, MultipartFile file)
+    {
+        try {
+            validateId(userId);
+            if (file == null || file.isEmpty()) {
+                throw new IllegalArgumentException("File must not be null or empty");
+            }
+            String contentType = file.getContentType();
+            if (contentType == null || !(contentType.equals("image/jpeg") || contentType.equals("image/png") || contentType.equals("image/webp"))) {
+                throw new IllegalArgumentException("Only image/jpeg, image/png, or image/webp allowed");
+            }
+
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new NoSuchElementException("User not found with ID: " + userId));
+
+            Path baseDir = Paths.get(uploadDir, "profile-pictures");
+            Files.createDirectories(baseDir);
+
+            String ext = getExtension(file.getOriginalFilename());
+            String fileName = "user_" + userId + "_" + System.currentTimeMillis() + (ext.isEmpty() ? "" : "." + ext);
+            Path target = baseDir.resolve(fileName);
+
+            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+            // Best-effort delete of old picture if it’s under the uploads dir
+            String oldPathStr = user.getProfilePicture();
+            if (oldPathStr != null && !oldPathStr.trim().isEmpty()) {
+                try {
+                    Path oldPath = Paths.get(oldPathStr);
+                    if (!oldPath.isAbsolute()) {
+                        oldPath = Paths.get(oldPathStr).normalize();
+                    }
+                    Path uploadBase = Paths.get(uploadDir).toAbsolutePath().normalize();
+                    Path oldAbs = oldPath.toAbsolutePath().normalize();
+                    if (Files.exists(oldAbs) && oldAbs.startsWith(uploadBase)) {
+                        Files.delete(oldAbs);
+                    }
+                } catch (Exception ex) {
+                    logger.warn("Failed to delete old profile picture for user {}: {}", userId, ex.getMessage());
+                }
+            }
+
+            String storedPath = target.toString(); // e.g., uploads/profile-pictures/...
+            user.setProfilePicture(storedPath);
+            userRepository.save(user);
+
+            logger.info("Updated profile picture for user {} -> {}", userId, storedPath);
+            return storedPath;
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error updating profile picture for {}: {}", userId, e.getMessage());
+            throw new RuntimeException("Failed to update profile picture", e);
+        }
+    }
+
+    private String getExtension(String name) {
+        if (name == null) return "";
+        int idx = name.lastIndexOf('.');
+        return idx >= 0 ? name.substring(idx + 1).toLowerCase() : "";
     }
 
     @Override
