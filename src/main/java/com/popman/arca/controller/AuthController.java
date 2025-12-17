@@ -6,6 +6,7 @@ import com.popman.arca.dto.refreshtoken.RefreshTokenRequest;
 import com.popman.arca.entity.RefreshToken;
 import com.popman.arca.entity.User;
 import com.popman.arca.service.JWTService;
+import com.popman.arca.service.BannedEmailService;
 import com.popman.arca.service.RefreshTokenService;
 import com.popman.arca.service.UserService;
 import org.slf4j.Logger;
@@ -28,20 +29,27 @@ public class AuthController {
     private final JWTService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final AuthenticationManager authenticationManager;
+    private final BannedEmailService bannedEmailService;
 
     public AuthController(UserService userService,
                           JWTService jwtService,
                           RefreshTokenService refreshTokenService,
-                          AuthenticationManager authenticationManager) {
+                          AuthenticationManager authenticationManager,
+                          BannedEmailService bannedEmailService) {
         this.userService = userService;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
         this.authenticationManager = authenticationManager;
+        this.bannedEmailService = bannedEmailService;
     }
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
         try {
+            if (bannedEmailService.isBanned(user.getEmail())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new ErrorResponse("Registration blocked: email is banned"));
+            }
             String result = userService.createUser(user);
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
@@ -59,6 +67,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         try {
+            if (bannedEmailService.isBanned(loginRequest.getEmail())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ErrorResponse("Login blocked: email is banned"));
+            }
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             loginRequest.getEmail(),
@@ -104,6 +116,10 @@ public class AuthController {
             refreshTokenService.verifyExpiration(refreshToken);
 
             User user = refreshToken.getUser();
+            if (bannedEmailService.isBanned(user.getEmail())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ErrorResponse("Refresh blocked: email is banned"));
+            }
             String newAccessToken = jwtService.generateToken(user.getEmail());
 
             logger.info("Token refreshed for user: {}", user.getEmail());

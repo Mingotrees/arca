@@ -2,6 +2,7 @@ package com.popman.arca.filter;
 
 
 import com.popman.arca.service.JWTService;
+import com.popman.arca.service.BannedEmailService;
 import com.popman.arca.service.MyUserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -39,23 +40,25 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            BannedEmailService bannedEmailService = context.getBean(BannedEmailService.class);
+            if (bannedEmailService.isBanned(email)) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Access blocked: email is banned\"}");
+                return;
+            }
             UserDetails userDetails = context.getBean(MyUserDetailsService.class).loadUserByUsername(email);
 
-            // 🔍 DEBUG: Check what authorities were loaded
-            System.out.println("===== JWT FILTER DEBUG =====");
-            System.out.println("📧 Email from token: " + email);
-            System.out.println("🔑 User authorities: " + userDetails.getAuthorities());
-            System.out.println("📍 Requested endpoint: " + request.getRequestURI());
+
 
             if (jwtService.validateToken(token, userDetails)) {
-                System.out.println("✅ Token is VALID");
+
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
-                System.out.println("✅ Authentication set with authorities: " + authToken.getAuthorities());
             }else{
-                System.out.println("❌ Token is INVALID");
+                System.out.println("Token is INVALID");
             }
         }
 
