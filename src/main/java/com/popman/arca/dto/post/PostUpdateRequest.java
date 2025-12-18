@@ -10,7 +10,7 @@ public class PostUpdateRequest {
 
     private String content;
 
-    private List<Long> postTags;
+    private String postTag;
 
     public PostUpdateRequest() {}
 
@@ -31,11 +31,11 @@ public class PostUpdateRequest {
         this.content = content;
     }
 
-    public List<Long> getPostTags() {
-        return postTags;
+    public String getPostTag() {
+        return postTag;
     }
 
-    public void setPostTags(List<Long> postTags) {
-        this.postTags = postTags;
+    public void setPostTag(String postTag) {
+        this.postTag = postTag;
     }
 }

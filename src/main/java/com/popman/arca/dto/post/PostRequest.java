@@ -20,7 +20,7 @@ public class PostRequest {
     @NotNull(message = "Department ID is required")
     private Long departmentId;
 
-    private List<Long> postTags ;
+    private String postTag;
 
     public PostRequest() {}
 
@@ -57,11 +57,11 @@ public class PostRequest {
         this.departmentId = departmentId;
     }
 
-    public List<Long> getPostTags() {
-        return postTags;
+    public String getPostTag() {
+        return postTag;
     }
 
-    public void setPostTags(List<Long> postTags) {
-        this.postTags = postTags;
+    public void setPostTag(String postTag) {
+        this.postTag = postTag;
     }
 }

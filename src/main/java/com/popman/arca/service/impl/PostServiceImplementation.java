@@ -89,13 +89,18 @@ public class PostServiceImplementation implements PostService {
         post.setUpdatedAt(LocalDateTime.now());
         post.setCreatedAt(LocalDateTime.now());
 
-        if(request.getPostTags() != null && !request.getPostTags().isEmpty()){
-
-            Set<Subject> subjects = new HashSet<>(subjectRepository.findSubjectByIdsAndDepartment(request.getPostTags(), request.getDepartmentId()));
-
-            if(subjects.size() != request.getPostTags().size()){
-                throw new RuntimeException("Some subjects do not belong to the department id " + request.getDepartmentId());
+        if(request.getPostTag() != null && !request.getPostTag().isEmpty()){
+            Subject subject = subjectRepository.findById(Long.parseLong(request.getPostTag()))
+                    .orElseThrow(() -> new RuntimeException("Subject not found with id: " + request.getPostTag()));
+            
+            boolean belongsToDepartment = subject.getListDepartments().stream()
+                    .anyMatch(dept -> dept.getId().equals(request.getDepartmentId()));
+            
+            if(!belongsToDepartment){
+                throw new RuntimeException("Subject does not belong to the department id " + request.getDepartmentId());
             }
+            Set<Subject> subjects = new HashSet<>();
+            subjects.add(subject);
             post.setSubjects(subjects);
         }
         postRepository.save(post);
@@ -128,18 +133,18 @@ public class PostServiceImplementation implements PostService {
         newVersion.setCreatedAt(LocalDateTime.now());
         newVersion.setUpdatedAt(LocalDateTime.now());
 
-        if (updateRequest.getPostTags() != null && !updateRequest.getPostTags().isEmpty()) {
-            Set<Subject> subjects = new HashSet<>(
-                    subjectRepository.findSubjectByIdsAndDepartment(
-                            updateRequest.getPostTags(),
-                            currentPost.getDepartmentId() // ✅ FIXED: use existing department
-                    )
-            );
-
-            if (subjects.size() != updateRequest.getPostTags().size()) {
-                throw new RuntimeException("Some subjects do not belong to the department id " + currentPost.getDepartmentId());
+        if (updateRequest.getPostTag() != null && !updateRequest.getPostTag().isEmpty()) {
+            Subject subject = subjectRepository.findById(Long.parseLong(updateRequest.getPostTag()))
+                    .orElseThrow(() -> new RuntimeException("Subject not found with id: " + updateRequest.getPostTag()));
+            
+            boolean belongsToDepartment = subject.getListDepartments().stream()
+                    .anyMatch(dept -> dept.getId().equals(currentPost.getDepartmentId()));
+            
+            if(!belongsToDepartment){
+                throw new RuntimeException("Subject does not belong to the department id " + currentPost.getDepartmentId());
             }
-
+            Set<Subject> subjects = new HashSet<>();
+            subjects.add(subject);
             newVersion.setSubjects(subjects);
         } else {
             newVersion.setSubjects(currentPost.getSubjects());
@@ -246,8 +251,10 @@ public class PostServiceImplementation implements PostService {
         response.setCreatedAt(post.getCreatedAt());
         response.setUpdatedAt(post.getUpdatedAt());
 
-        List<String> tags = post.getSubjects().stream().map(Subject::getName).toList();
-        response.setPostTags(tags);
+        if (!post.getSubjects().isEmpty()) {
+            String tag = post.getSubjects().stream().findFirst().map(Subject::getName).orElse(null);
+            response.setPostTag(tag);
+        }
 
         if (post.getUser() != null) {
             response.setUserId(post.getUser().getId());

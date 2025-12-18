@@ -18,7 +18,7 @@ public class PostResponse {
     private Long departmentId;
     private String departmentName;
 
-    private List<String> postTags;
+    private String postTag;
     private String rejectionReason;
     private Boolean IsLatestVersion;
     private LocalDateTime createdAt;
@@ -142,12 +142,12 @@ public class PostResponse {
         this.departmentName = departmentName;
     }
 
-    public List<String> getPostTags() {
-        return postTags;
+    public String getPostTag() {
+        return postTag;
     }
 
-    public void setPostTags(List<String> postTags) {
-        this.postTags = postTags;
+    public void setPostTag(String postTag) {
+        this.postTag = postTag;
     }
 
     public String getRejectionReason() {
