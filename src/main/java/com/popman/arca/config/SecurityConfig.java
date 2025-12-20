@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -49,6 +50,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/department/**").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN")
@@ -67,11 +69,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(defaultIfEmpty(allowedOrigins, List.of("*")));
+        // Use explicit origins configured in application.properties
+        configuration.setAllowedOrigins(defaultIfEmpty(allowedOrigins, List.of("*")));
         configuration.setAllowedMethods(defaultIfEmpty(allowedMethods, List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")));
-        configuration.setAllowedHeaders(defaultIfEmpty(allowedHeaders, List.of("*")));
+        configuration.setAllowedHeaders(defaultIfEmpty(allowedHeaders, List.of("Authorization", "Content-Type", "Cache-Control")));
         configuration.setAllowCredentials(true);
-        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

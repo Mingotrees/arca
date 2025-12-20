@@ -6,6 +6,7 @@ import com.popman.arca.dto.post.PostApprovalRequest;
 import com.popman.arca.dto.post.PostRequest;
 import com.popman.arca.dto.post.PostResponse;
 import com.popman.arca.dto.post.PostUpdateRequest;
+import com.popman.arca.dto.post.PostCreateResponse;
 import com.popman.arca.entity.Department;
 import com.popman.arca.entity.Post;
 import com.popman.arca.entity.Subject;
@@ -52,7 +53,7 @@ public class PostServiceImplementation implements PostService {
 
     @Override
     public List<PostResponse> getAllUserPost(Long userId) {
-        List<Post> posts = postRepository.findLatestApprovedPostsByDepartmentId(userId);
+        List<Post> posts = postRepository.findLatestApprovedPostsByUserId(userId);
         return posts.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -68,7 +69,7 @@ public class PostServiceImplementation implements PostService {
 
     @Override
     @Transactional
-    public String createPost(PostRequest request) {
+    public PostCreateResponse createPost(PostRequest request) {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new RuntimeException ("User not found with Id " + request.getUserId()));
 
@@ -105,7 +106,8 @@ public class PostServiceImplementation implements PostService {
         }
         postRepository.save(post);
 
-        return "Post created successfully with Id " + post.getId() + ". Awaiting admin approval";
+        String message = "Post created successfully with Id " + post.getId() + ". Awaiting admin approval";
+        return new PostCreateResponse(request.getUserId(), post.getPost_id(), message);
     }
 
     @Override
@@ -159,7 +161,7 @@ public class PostServiceImplementation implements PostService {
     public List<PostResponse> getAllPendingApprovalPosts() {
         List<Post> pendingPost = postRepository.findAllPendingApprovalPosts();
         return pendingPost.stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponse)   
                 .collect(Collectors.toList());
     }
 
@@ -223,7 +225,7 @@ public class PostServiceImplementation implements PostService {
     @Override
     public List<PostResponse> getPostHistory(Integer postId) {
         List<Post> versions = postRepository.findAllVersionsByPostId(postId);
-        return versions.stream().map(this::mapToResponse).toList();
+        return versions.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
     @Override
@@ -235,7 +237,7 @@ public class PostServiceImplementation implements PostService {
     @Override
     public List<PostResponse> getPendingPostsByDepartment(Long departmentId){
         List<Post> posts = postRepository.getPendingPostsByDepartment(departmentId);
-        return posts.stream().map(this::mapToResponse).toList();
+        return posts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
 
@@ -287,14 +289,14 @@ public class PostServiceImplementation implements PostService {
         }
 
         if (post.getFiles() != null && !post.getFiles().isEmpty()) {
-            List<FileResponse> fileResponses = post.getFiles().stream()
+                List<FileResponse> fileResponses = post.getFiles().stream()
                     .map(file -> new FileResponse(
-                            file.getId(),
-                            file.getFileName(),
-                            file.getFileType(),
-                            file.getFileSize()
+                        file.getId(),
+                        file.getFileName(),
+                        file.getFileType(),
+                        file.getFileSize()
                     ))
-                    .toList();
+                    .collect(Collectors.toList());
             response.setFiles(fileResponses);
         }
 

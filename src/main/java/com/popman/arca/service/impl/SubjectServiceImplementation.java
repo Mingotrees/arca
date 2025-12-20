@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class SubjectServiceImplementation implements SubjectService{
@@ -49,9 +50,9 @@ public class SubjectServiceImplementation implements SubjectService{
         subject.setAliases(request.getAliases());
 
         List<Department> attachedDepartments = request.getDepartmentIds().stream()
-                .map(id -> departmentRepository.findById(id)
-                        .orElseThrow(() -> new RuntimeException("Department not found with id: " + id)))
-                .toList();
+            .map(id -> departmentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Department not found with id: " + id)))
+            .collect(Collectors.toList());
 
         subject.setListDepartments(attachedDepartments);
         return subjectRepository.save(subject);

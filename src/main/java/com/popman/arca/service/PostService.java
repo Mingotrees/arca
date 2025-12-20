@@ -7,6 +7,7 @@ import com.popman.arca.dto.post.PostResponse;
 import com.popman.arca.dto.post.PostUpdateRequest;
 
 import java.util.List;
+import com.popman.arca.dto.post.PostCreateResponse;
 
 public interface PostService {
     //retrieve specific post
@@ -19,7 +20,7 @@ public interface PostService {
     public List<PostResponse> getAllDepartmentPost(Long departmentId);
 
     //create post
-    public String createPost(PostRequest post);
+    public PostCreateResponse createPost(PostRequest post);
 
     //update
     public String updatePost(PostUpdateRequest updateRequest, Long postId);

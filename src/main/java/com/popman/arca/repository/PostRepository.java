@@ -43,4 +43,10 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     @Query("SELECT p FROM Post p WHERE p.departmentId = :departmentId AND p.status = 'PENDING_APPROVAL'")
     List<Post> getPendingPostsByDepartment(@Param("departmentId") Long departmentId);
+
+    @Query("SELECT p FROM Post p WHERE p.user.id = :userId " +
+            "AND p.status = 'APPROVED' AND p.isLatestVersion = true " +
+            "ORDER BY p.updatedAt DESC")
+    List<Post> findLatestApprovedPostsByUserId(@Param("userId") Long userId);
+
 }

@@ -1,5 +1,8 @@
 package com.popman.arca.service.impl;
 
+import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.BlobInfo;
+import com.google.cloud.storage.Storage;
 import com.popman.arca.entity.User;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.UserService;
@@ -12,10 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -27,13 +26,19 @@ public class UserServiceImplementation implements UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserServiceImplementation.class);
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final Storage storage;
 
-    @Value("${file.upload-dir}")
-    private String uploadDir;
+    @Value("${spring.cloud.gcp.storage.bucket:arca-uploads}")
+    private String bucketName;
 
-    public UserServiceImplementation(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserServiceImplementation(UserRepository userRepository, PasswordEncoder passwordEncoder, Storage storage) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.storage = storage;
+    }
+
+    private String buildPublicUrl(String objectName) {
+        return "https://storage.googleapis.com/" + bucketName + "/" + objectName;
     }
 
     @Override
@@ -272,39 +277,34 @@ public class UserServiceImplementation implements UserService {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new NoSuchElementException("User not found with ID: " + userId));
 
-            Path baseDir = Paths.get(uploadDir, "profile-pictures");
-            Files.createDirectories(baseDir);
-
             String ext = getExtension(file.getOriginalFilename());
-            String fileName = "user_" + userId + "_" + System.currentTimeMillis() + (ext.isEmpty() ? "" : "." + ext);
-            Path target = baseDir.resolve(fileName);
+            String objectName = "profile-pictures/user_" + userId + "_" + System.currentTimeMillis() + (ext.isEmpty() ? "" : "." + ext);
 
-            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+            BlobInfo blobInfo = BlobInfo.newBuilder(bucketName, objectName)
+                    .setContentType(file.getContentType())
+                    .build();
+            storage.create(blobInfo, file.getBytes());
 
-            // Best-effort delete of old picture if it’s under the uploads dir
             String oldPathStr = user.getProfilePicture();
             if (oldPathStr != null && !oldPathStr.trim().isEmpty()) {
                 try {
-                    Path oldPath = Paths.get(oldPathStr);
-                    if (!oldPath.isAbsolute()) {
-                        oldPath = Paths.get(oldPathStr).normalize();
-                    }
-                    Path uploadBase = Paths.get(uploadDir).toAbsolutePath().normalize();
-                    Path oldAbs = oldPath.toAbsolutePath().normalize();
-                    if (Files.exists(oldAbs) && oldAbs.startsWith(uploadBase)) {
-                        Files.delete(oldAbs);
-                    }
+                    String prefix1 = "https://storage.googleapis.com/" + bucketName + "/";
+                    String prefix2 = "https://" + bucketName + ".storage.googleapis.com/";
+                    String oldObject = oldPathStr.startsWith(prefix1) ? oldPathStr.substring(prefix1.length())
+                            : oldPathStr.startsWith(prefix2) ? oldPathStr.substring(prefix2.length())
+                            : oldPathStr;
+                    storage.delete(BlobId.of(bucketName, oldObject));
                 } catch (Exception ex) {
                     logger.warn("Failed to delete old profile picture for user {}: {}", userId, ex.getMessage());
                 }
             }
 
-            String storedPath = target.toString(); // e.g., uploads/profile-pictures/...
-            user.setProfilePicture(storedPath);
+            String publicUrl = buildPublicUrl(objectName);
+            user.setProfilePicture(publicUrl);
             userRepository.save(user);
 
-            logger.info("Updated profile picture for user {} -> {}", userId, storedPath);
-            return storedPath;
+            logger.info("Updated profile picture for user {} -> {}", userId, publicUrl);
+            return publicUrl;
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {

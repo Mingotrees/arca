@@ -2,6 +2,7 @@ package com.popman.arca.controller;
 
 import com.popman.arca.dto.post.PostApprovalRequest;
 import com.popman.arca.dto.post.PostRequest;
+import com.popman.arca.dto.post.PostCreateResponse;
 import com.popman.arca.dto.post.PostResponse;
 import com.popman.arca.dto.post.PostUpdateRequest;
 import com.popman.arca.service.PostService;
@@ -43,9 +44,9 @@ public class PostController {
     }
 
     @PostMapping
-    public ResponseEntity<String> createPost(@Valid @RequestBody PostRequest newPost) {
-        String message = postService.createPost(newPost);
-        return ResponseEntity.status(HttpStatus.CREATED).body(message);
+    public ResponseEntity<PostCreateResponse> createPost(@Valid @RequestBody PostRequest newPost) {
+        PostCreateResponse response = postService.createPost(newPost);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PutMapping("/{postId}")
