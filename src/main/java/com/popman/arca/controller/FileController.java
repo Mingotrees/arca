@@ -20,7 +20,6 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/files")
 public class FileController {
 
-
     private final FileService fileService;
 
     public FileController(FileService fileService){
