@@ -1,7 +1,7 @@
 package com.popman.arca.service.impl;
 
-import com.popman.arca.dto.vote.VoteRequest;
-import com.popman.arca.dto.vote.VoteResponse;
+import com.popman.arca.dto.v1.vote.VoteRequest;
+import com.popman.arca.dto.v1.vote.VoteResponse;
 import com.popman.arca.entity.Post;
 import com.popman.arca.entity.User;
 import com.popman.arca.entity.Vote;
@@ -26,7 +26,7 @@ public class VoteServiceImplementation implements VoteService {
     private UserRepository userRepository;
 
     @Transactional
-    public VoteResponse createOrUpdateVote(VoteRequest request, Long userId) {
+    public VoteResponse createOrUpdateVoteV1(VoteRequest request, Long userId) {
 
         Post post = postRepository.findById(request.getPostId())
                 .orElseThrow(() -> new RuntimeException("Post not found"));
@@ -56,21 +56,21 @@ public class VoteServiceImplementation implements VoteService {
     }
 
     @Transactional
-    public void removeVote(Long postId, Long userId) {
+    public void removeVoteV1(Long postId, Long userId) {
         voteRepository.deleteByPostIdAndUserId(postId, userId);
     }
 
-    public VoteResponse getUserVoteForPost(Long postId, Long userId) {
+    public VoteResponse getUserVoteForPostV1(Long postId, Long userId) {
         return voteRepository.findByPostIdAndUserId(postId, userId)
                 .map(this::convertToDTO)
                 .orElse(null);
     }
 
-    public Integer getUpvoteCount(Long postId) {
+    public Integer getUpvoteCountV1(Long postId) {
         return voteRepository.countByPostIdAndVoteType(postId, "UPVOTE");
     }
 
-    public Integer getDownvoteCount(Long postId) {
+    public Integer getDownvoteCountV1(Long postId) {
         return voteRepository.countByPostIdAndVoteType(postId, "DOWNVOTE");
     }
 

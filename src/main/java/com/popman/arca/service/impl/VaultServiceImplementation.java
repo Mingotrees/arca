@@ -26,7 +26,7 @@ public class VaultServiceImplementation implements VaultService {
     }
 
     @Override
-    public Vault addToVault(Long userId, Long postId, String label){
+    public Vault addToVaultV1(Long userId, Long postId, String label){
 
         try {
             if(vaultRepository.existsByUserIdAndPostId(userId, postId)){
@@ -46,7 +46,7 @@ public class VaultServiceImplementation implements VaultService {
     }
 
     @Override
-    public void removeFromVault(Long userId, Long postId){
+    public void removeFromVaultV1(Long userId, Long postId){
 
         try{
             Optional<Vault> vaultEntry = vaultRepository.findByUserIdAndPostId(userId, postId);
@@ -60,7 +60,7 @@ public class VaultServiceImplementation implements VaultService {
     }
 
     @Override
-    public Vault editLabel(Long userId, Long postId, String newLabel) {
+    public Vault editLabelV1(Long userId, Long postId, String newLabel) {
 
         try {
             Vault vault = vaultRepository.findByUserIdAndPostId(userId, postId).orElseThrow(()-> new RuntimeException("Vault entry not found for this user and post"));
@@ -75,7 +75,7 @@ public class VaultServiceImplementation implements VaultService {
     }
 
     @Override
-    public List<Vault> getUserVault(Long userId){
+    public List<Vault> getUserVaultV1(Long userId){
         try {
             return vaultRepository.findByUserId(userId);
         }catch (Exception e){
@@ -85,12 +85,12 @@ public class VaultServiceImplementation implements VaultService {
     }
 
     @Override
-    public Optional<Vault> getVaultEntry(Long id) {
+    public Optional<Vault> getVaultEntryV1(Long id) {
         return Optional.empty();
     }
 
     @Override
-    public boolean isPostSaved(Long userId, Long postId){
+    public boolean isPostSavedV1(Long userId, Long postId){
         try {
             return vaultRepository.existsByUserIdAndPostId(userId, postId);
         }catch(Exception e){

@@ -50,7 +50,7 @@ public class FileServiceImplementation implements FileService {
 
 
     @Override
-    public File uploadFile(MultipartFile file, Long userId, Long postId) throws IOException {
+    public File uploadFileV1(MultipartFile file, Long userId, Long postId) throws IOException {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with id " + userId));
         Post post = postRepository.findById(postId)
@@ -89,7 +89,7 @@ public class FileServiceImplementation implements FileService {
     }
 
     @Override
-    public Resource downloadFile(Long id) throws IOException {
+    public Resource downloadFileV1(Long id) throws IOException {
 
         File fileEntity = fileRepository.findById(id)
                 .orElseThrow(() -> new IOException("File not found with id" + id));
@@ -111,7 +111,7 @@ public class FileServiceImplementation implements FileService {
     }
 
     @Override
-    public String getFileContentType(Long id) throws IOException {
+    public String getFileContentTypeV1(Long id) throws IOException {
         File fileEntity = fileRepository.findById(id)
                 .orElseThrow(() -> new IOException("File not found with id" + id));
 
@@ -131,7 +131,7 @@ public class FileServiceImplementation implements FileService {
     }
 
     @Override
-    public Optional<File> getFile(Long id) {
+    public Optional<File> getFileV1(Long id) {
         return fileRepository.findById(id);
     }
 }

@@ -42,7 +42,7 @@ public class UserServiceImplementation implements UserService {
     }
 
     @Override
-    public User getUser(Long userId) {
+    public User getUserV1(Long userId) {
         try {
             logger.debug("Fetching user with ID: {}", userId);
             return userRepository.findById(userId)
@@ -54,7 +54,7 @@ public class UserServiceImplementation implements UserService {
     }
 
     @Override
-    public List<User> getAllUser() {
+    public List<User> getAllUserV1() {
         try {
             logger.debug("Fetching all users");
             return userRepository.findAll();
@@ -66,7 +66,7 @@ public class UserServiceImplementation implements UserService {
 
     @Override
     @Transactional
-    public String createUser(User user) {
+    public String createUserV1(User user) {
         try {
             logger.debug("Creating new user: {}", user.getEmail());
             validateUser(user);
@@ -104,7 +104,7 @@ public class UserServiceImplementation implements UserService {
 
     @Override
     @Transactional
-    public String createAdmin(User user) {
+    public String createAdminV1(User user) {
         try {
             logger.debug("Creating new admin user: {}", user.getEmail());
             validateUser(user);
@@ -140,7 +140,7 @@ public class UserServiceImplementation implements UserService {
 
     @Override
     @Transactional
-    public String promoteToAdmin(Long userId) {
+    public String promoteToAdminV1(Long userId) {
         try {
             logger.debug("Promoting user {} to admin", userId);
             validateId(userId);
@@ -168,7 +168,7 @@ public class UserServiceImplementation implements UserService {
 
     @Override
     @Transactional
-    public String demoteFromAdmin(Long userId) {
+    public String demoteFromAdminV1(Long userId) {
         try {
             logger.debug("Demoting user {} from admin", userId);
             validateId(userId);
@@ -201,7 +201,7 @@ public class UserServiceImplementation implements UserService {
 
     @Override
     @Transactional
-    public String addRoleToUser(Long userId, String role) {
+    public String addRoleToUserV1(Long userId, String role) {
         try {
             logger.debug("Adding role {} to user {}", role, userId);
             validateId(userId);
@@ -230,7 +230,7 @@ public class UserServiceImplementation implements UserService {
 
     @Override
     @Transactional
-    public String removeRoleFromUser(Long userId, String role) {
+    public String removeRoleFromUserV1(Long userId, String role) {
         try {
             logger.debug("Removing role {} from user {}", role, userId);
             validateId(userId);
@@ -262,7 +262,7 @@ public class UserServiceImplementation implements UserService {
     }
 
     @Override
-    public String updateProfilePicture(Long userId, MultipartFile file)
+    public String updateProfilePictureV1(Long userId, MultipartFile file)
     {
         try {
             validateId(userId);
@@ -321,7 +321,7 @@ public class UserServiceImplementation implements UserService {
 
     @Override
     @Transactional
-    public String updateUser(User user) {
+    public String updateUserV1(User user) {
         try {
             logger.debug("Updating user with ID: {}", user.getId());
             validateId(user.getId());
@@ -377,7 +377,7 @@ public class UserServiceImplementation implements UserService {
 
     @Override
     @Transactional
-    public String deleteUser(Long userId) {
+    public String deleteUserv1(Long userId) {
         try {
             logger.debug("Deleting user with Id: {}", userId);
             validateId(userId);
