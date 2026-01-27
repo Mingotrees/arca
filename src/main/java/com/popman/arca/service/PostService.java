@@ -1,42 +1,42 @@
 package com.popman.arca.service;
 
 
-import com.popman.arca.dto.post.PostApprovalRequest;
-import com.popman.arca.dto.post.PostRequest;
-import com.popman.arca.dto.post.PostResponse;
-import com.popman.arca.dto.post.PostUpdateRequest;
+import com.popman.arca.dto.v1.post.PostApprovalRequest;
+import com.popman.arca.dto.v1.post.PostRequest;
+import com.popman.arca.dto.v1.post.PostResponse;
+import com.popman.arca.dto.v1.post.PostUpdateRequest;
 
 import java.util.List;
-import com.popman.arca.dto.post.PostCreateResponse;
+import com.popman.arca.dto.v1.post.PostCreateResponse;
 
 public interface PostService {
     //retrieve specific post
-    public PostResponse getPost(Long postId);
+    public PostResponse getPostV1(Long postId);
 
     //retrieve all posts made by a specific user
-    public List<PostResponse> getAllUserPost(Long userId);
+    public List<PostResponse> getAllUserPostV1(Long userId);
 
     //retrieve all posts associated with a specific department
-    public List<PostResponse> getAllDepartmentPost(Long departmentId);
+    public List<PostResponse> getAllDepartmentPostV1(Long departmentId);
 
     //create post
-    public PostCreateResponse createPost(PostRequest post);
+    public PostCreateResponse createPostV1(PostRequest post);
 
     //update
-    public String updatePost(PostUpdateRequest updateRequest, Long postId);
+    public String updatePostV1(PostUpdateRequest updateRequest, Long postId);
 
     //fetch all that needs approval
-    public List<PostResponse> getAllPendingApprovalPosts();
+    public List<PostResponse> getAllPendingApprovalPostsV1();
 
     //approve post
-    public String approvePost(PostApprovalRequest postApprovalRequest, Long postId);
+    public String approvePostV1(PostApprovalRequest postApprovalRequest, Long postId);
 
     //previous versions of a post
-    public List<PostResponse> getPostHistory(Integer postId);
+    public List<PostResponse> getPostHistoryV1(Integer postId);
 
     //softDelete
-    public String deletePost(Long postId);
+    public String deletePostV1(Long postId);
 
     //pending posts per department
-    public List<PostResponse> getPendingPostsByDepartment(Long departmentId);
+    public List<PostResponse> getPendingPostsByDepartmentV1(Long departmentId);
 }

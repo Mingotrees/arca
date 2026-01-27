@@ -1,7 +1,7 @@
 package com.popman.arca.service.impl;
 
-import com.popman.arca.dto.department.DepartmentDetailResponse;
-import com.popman.arca.dto.department.DepartmentRequest;
+import com.popman.arca.dto.v1.department.DepartmentDetailResponse;
+import com.popman.arca.dto.v1.department.DepartmentRequest;
 import com.popman.arca.entity.Department;
 import com.popman.arca.entity.School;
 import com.popman.arca.repository.DepartmentRepository;
@@ -24,14 +24,14 @@ public class DepartmentServiceImplementation implements DepartmentService {
     }
 
     @Override
-    public DepartmentDetailResponse getDepartment(Long id) {
+    public DepartmentDetailResponse getDepartmentV1(Long id) {
         Department department = departmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Department not found with ID: " + id));
         return mapToDepartmentDetailResponse(department);
     }
 
     @Override
-    public List<DepartmentDetailResponse> getAllDepartments() {
+    public List<DepartmentDetailResponse> getAllDepartmentsV1() {
         return departmentRepository.findAll()
                 .stream()
                 .map(this::mapToDepartmentDetailResponse)
@@ -39,7 +39,7 @@ public class DepartmentServiceImplementation implements DepartmentService {
     }
 
     @Override
-    public DepartmentDetailResponse createDepartment(DepartmentRequest departmentRequest) {
+    public DepartmentDetailResponse createDepartmentV1(DepartmentRequest departmentRequest) {
         School school = schoolRepository.findById(departmentRequest.getSchoolId())
                 .orElseThrow(() -> new RuntimeException("School not found with ID: " + departmentRequest.getSchoolId()));
 
@@ -52,7 +52,7 @@ public class DepartmentServiceImplementation implements DepartmentService {
     }
 
     @Override
-    public DepartmentDetailResponse updateDepartment(Long id, DepartmentRequest departmentRequest) {
+    public DepartmentDetailResponse updateDepartmentV1(Long id, DepartmentRequest departmentRequest) {
         Department department = departmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Department not found with ID: " + id));
 
@@ -70,7 +70,7 @@ public class DepartmentServiceImplementation implements DepartmentService {
     }
 
     @Override
-    public void deleteDepartment(Long departmentId) {
+    public void deleteDepartmentV1(Long departmentId) {
         departmentRepository.deleteById(departmentId);
     }
 

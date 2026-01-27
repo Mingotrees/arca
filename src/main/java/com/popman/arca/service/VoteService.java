@@ -1,18 +1,18 @@
 package com.popman.arca.service;
 
-import com.popman.arca.dto.vote.VoteRequest;
-import com.popman.arca.dto.vote.VoteResponse;
+import com.popman.arca.dto.v1.vote.VoteRequest;
+import com.popman.arca.dto.v1.vote.VoteResponse;
 
 public interface VoteService {
 
-    VoteResponse createOrUpdateVote(VoteRequest request, Long userId);
+    VoteResponse createOrUpdateVoteV1(VoteRequest request, Long userId);
 
-    void removeVote(Long postId, Long userId);
+    void removeVoteV1(Long postId, Long userId);
 
-    VoteResponse getUserVoteForPost(Long postId, Long userId);
+    VoteResponse getUserVoteForPostV1(Long postId, Long userId);
 
-    Integer getUpvoteCount(Long postId);
+    Integer getUpvoteCountV1(Long postId);
 
-    Integer getDownvoteCount(Long postId);
+    Integer getDownvoteCountV1(Long postId);
 
 }

@@ -56,7 +56,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             BannedEmailService bannedEmailService = context.getBean(BannedEmailService.class);
-            if (bannedEmailService.isBanned(email)) {
+            if (bannedEmailService.isBannedV1(email)) {
                 // Ensure CORS headers are present on short-circuit responses
                 String origin = request.getHeader("Origin");
                 if (origin != null) {

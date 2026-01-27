@@ -8,8 +8,8 @@ import java.io.IOException;
 import java.util.Optional;
 
 public interface FileService {
-    File uploadFile(MultipartFile file, Long userId, Long postId) throws IOException;
-    Resource downloadFile(Long id) throws IOException;
-    Optional<File> getFile(Long id);
-    String getFileContentType(Long id) throws IOException;
+    File uploadFileV1(MultipartFile file, Long userId, Long postId) throws IOException;
+    Resource downloadFileV1(Long id) throws IOException;
+    Optional<File> getFileV1(Long id);
+    String getFileContentTypeV1(Long id) throws IOException;
 }

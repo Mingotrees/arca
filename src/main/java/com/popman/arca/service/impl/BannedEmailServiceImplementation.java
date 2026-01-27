@@ -21,14 +21,14 @@ public class BannedEmailServiceImplementation implements BannedEmailService {
     }
 
     @Override
-    public boolean isBanned(String email) {
+    public boolean isBannedV1(String email) {
         if (email == null || email.trim().isEmpty()) return false;
         return bannedEmailRepository.existsByEmailIgnoreCase(email.trim());
     }
 
     @Override
     @Transactional
-    public String ban(String email, String reason) {
+    public String banV1(String email, String reason) {
         if (email == null || email.trim().isEmpty()) {
             throw new IllegalArgumentException("Email cannot be null or empty");
         }
@@ -44,7 +44,7 @@ public class BannedEmailServiceImplementation implements BannedEmailService {
 
     @Override
     @Transactional
-    public String unban(String email) {
+    public String unbanV1(String email) {
         if (email == null || email.trim().isEmpty()) {
             throw new IllegalArgumentException("Email cannot be null or empty");
         }
@@ -58,7 +58,7 @@ public class BannedEmailServiceImplementation implements BannedEmailService {
     }
 
     @Override
-    public List<BannedEmail> listAll() {
+    public List<BannedEmail> listAllV1() {
         return bannedEmailRepository.findAll();
     }
 }

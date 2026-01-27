@@ -1,12 +1,12 @@
 package com.popman.arca.service.impl;
 
 
-import com.popman.arca.dto.file.FileResponse;
-import com.popman.arca.dto.post.PostApprovalRequest;
-import com.popman.arca.dto.post.PostRequest;
-import com.popman.arca.dto.post.PostResponse;
-import com.popman.arca.dto.post.PostUpdateRequest;
-import com.popman.arca.dto.post.PostCreateResponse;
+import com.popman.arca.dto.v1.file.FileResponse;
+import com.popman.arca.dto.v1.post.PostApprovalRequest;
+import com.popman.arca.dto.v1.post.PostRequest;
+import com.popman.arca.dto.v1.post.PostResponse;
+import com.popman.arca.dto.v1.post.PostUpdateRequest;
+import com.popman.arca.dto.v1.post.PostCreateResponse;
 import com.popman.arca.entity.Department;
 import com.popman.arca.entity.Post;
 import com.popman.arca.entity.Subject;
@@ -45,14 +45,14 @@ public class PostServiceImplementation implements PostService {
     private SubjectRepository subjectRepository;
 
     @Override
-    public PostResponse getPost(Long postId) {
+    public PostResponse getPostV1(Long postId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(()-> new RuntimeException("Post not found with id: " + postId));
         return mapToResponse(post);
     }
 
     @Override
-    public List<PostResponse> getAllUserPost(Long userId) {
+    public List<PostResponse> getAllUserPostV1(Long userId) {
         List<Post> posts = postRepository.findLatestApprovedPostsByUserId(userId);
         return posts.stream()
                 .map(this::mapToResponse)
@@ -60,7 +60,7 @@ public class PostServiceImplementation implements PostService {
     }
 
     @Override
-    public List<PostResponse> getAllDepartmentPost(Long departmentId) {
+    public List<PostResponse> getAllDepartmentPostV1(Long departmentId) {
         List<Post> posts = postRepository.findLatestApprovedPostsByDepartmentId(departmentId);
         return posts.stream()
                 .map(this::mapToResponse)
@@ -69,7 +69,7 @@ public class PostServiceImplementation implements PostService {
 
     @Override
     @Transactional
-    public PostCreateResponse createPost(PostRequest request) {
+    public PostCreateResponse createPostV1(PostRequest request) {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new RuntimeException ("User not found with Id " + request.getUserId()));
 
@@ -112,7 +112,7 @@ public class PostServiceImplementation implements PostService {
 
     @Override
     @Transactional
-    public String updatePost(PostUpdateRequest updateRequest, Long postId) {
+    public String updatePostV1(PostUpdateRequest updateRequest, Long postId) {
         Post currentPost = postRepository.findById(postId)
                 .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
 
@@ -158,7 +158,7 @@ public class PostServiceImplementation implements PostService {
     }
 
     @Override
-    public List<PostResponse> getAllPendingApprovalPosts() {
+    public List<PostResponse> getAllPendingApprovalPostsV1() {
         List<Post> pendingPost = postRepository.findAllPendingApprovalPosts();
         return pendingPost.stream()
                 .map(this::mapToResponse)   
@@ -167,7 +167,7 @@ public class PostServiceImplementation implements PostService {
 
     @Override
     @Transactional
-    public String approvePost(PostApprovalRequest approvalRequest, Long postId) {
+    public String approvePostV1(PostApprovalRequest approvalRequest, Long postId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
 
@@ -223,19 +223,19 @@ public class PostServiceImplementation implements PostService {
     }
 
     @Override
-    public List<PostResponse> getPostHistory(Integer postId) {
+    public List<PostResponse> getPostHistoryV1(Integer postId) {
         List<Post> versions = postRepository.findAllVersionsByPostId(postId);
         return versions.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
     @Override
     //softdelete to be implemented
-    public String deletePost(Long postId) {
+    public String deletePostV1(Long postId) {
         return "";
     }
 
     @Override
-    public List<PostResponse> getPendingPostsByDepartment(Long departmentId){
+    public List<PostResponse> getPendingPostsByDepartmentV1(Long departmentId){
         List<Post> posts = postRepository.getPendingPostsByDepartment(departmentId);
         return posts.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
@@ -278,8 +278,8 @@ public class PostServiceImplementation implements PostService {
         }
 
         try {
-            Integer upvotes = voteServiceImplementation.getUpvoteCount(post.getId());
-            Integer downvotes = voteServiceImplementation.getDownvoteCount(post.getId());
+            Integer upvotes = voteServiceImplementation.getUpvoteCountV1(post.getId());
+            Integer downvotes = voteServiceImplementation.getDownvoteCountV1(post.getId());
 
             response.setUpvoteCount(upvotes);
             response.setDownvoteCount(downvotes);

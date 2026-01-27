@@ -1,7 +1,7 @@
 package com.popman.arca.service.impl;
-import com.popman.arca.dto.department.DepartmentResponse;
-import com.popman.arca.dto.subject.SubjectRequest;
-import com.popman.arca.dto.subject.SubjectResponse;
+import com.popman.arca.dto.v1.department.DepartmentResponse;
+import com.popman.arca.dto.v1.subject.SubjectRequest;
+import com.popman.arca.dto.v1.subject.SubjectResponse;
 import com.popman.arca.entity.Department;
 import com.popman.arca.entity.Subject;
 import com.popman.arca.repository.DepartmentRepository;
@@ -26,17 +26,17 @@ public class SubjectServiceImplementation implements SubjectService{
     }
 
     @Override
-    public List<Subject> getAllSubjects() {
+    public List<Subject> getAllSubjectsV1() {
         return subjectRepository.findAll();
     }
 
     @Override
-    public Subject getSubjectById(Long id) {
+    public Subject getSubjectByIdV1(Long id) {
         return subjectRepository.findById(id).orElseThrow(() -> new RuntimeException("Subject not found by id: " + id));
     }
 
     @Override
-    public Subject createSubject(SubjectRequest request) {
+    public Subject createSubjectV1(SubjectRequest request) {
         if(subjectRepository.existsByCode(request.getCode())){
             throw new RuntimeException("Subject with code : " + request.getCode() + " already exists");
         }
@@ -59,8 +59,8 @@ public class SubjectServiceImplementation implements SubjectService{
     }
 
     @Override
-    public Subject updateSubject(Long id, SubjectRequest request) {
-        Subject existingSubject = getSubjectById(id);
+    public Subject updateSubjectV1(Long id, SubjectRequest request) {
+        Subject existingSubject = getSubjectByIdV1(id);
 
         existingSubject.setCode(request.getCode());
         existingSubject.setName(request.getName());
@@ -79,7 +79,7 @@ public class SubjectServiceImplementation implements SubjectService{
     }
 
     @Override
-    public void deleteSubject(Long id) {
+    public void deleteSubjectV1(Long id) {
         if(!subjectRepository.existsById(id)){
             throw new RuntimeException("Subject not found by id: " + id);
         }
@@ -87,7 +87,7 @@ public class SubjectServiceImplementation implements SubjectService{
     }
 
     @Override
-    public SubjectResponse mapToResponse(Subject subject){
+    public SubjectResponse mapToResponseV1(Subject subject){
 
         SubjectResponse response =  new SubjectResponse();
         response.setId(subject.getId());

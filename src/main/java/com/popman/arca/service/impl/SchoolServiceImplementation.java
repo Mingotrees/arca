@@ -1,8 +1,8 @@
 package com.popman.arca.service.impl;
 
-import com.popman.arca.dto.school.SchoolRequest;
-import com.popman.arca.dto.school.SchoolResponse;
-import com.popman.arca.dto.department.DepartmentResponse;
+import com.popman.arca.dto.v1.school.SchoolRequest;
+import com.popman.arca.dto.v1.school.SchoolResponse;
+import com.popman.arca.dto.v1.department.DepartmentResponse;
 import com.popman.arca.entity.School;
 import com.popman.arca.repository.SchoolRepository;
 import com.popman.arca.service.SchoolService;
@@ -21,7 +21,7 @@ public class SchoolServiceImplementation implements SchoolService {
     }
 
     @Override
-    public SchoolResponse addSchool(SchoolRequest request) {
+    public SchoolResponse addSchoolV1(SchoolRequest request) {
         School school = new School();
         school.setName(request.getName());
         School saved = schoolRepository.save(school);
@@ -29,14 +29,14 @@ public class SchoolServiceImplementation implements SchoolService {
     }
 
     @Override
-    public SchoolResponse getSchool(Long id) {
+    public SchoolResponse getSchoolV1(Long id) {
         School school = schoolRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("School not found with ID: " + id));
         return mapToResponse(school);
     }
 
     @Override
-    public List<SchoolResponse> getAllSchool() {
+    public List<SchoolResponse> getAllSchoolV1() {
         return schoolRepository.findAll()
                 .stream()
                 .map(this::mapToResponse)
@@ -44,7 +44,7 @@ public class SchoolServiceImplementation implements SchoolService {
     }
 
     @Override
-    public SchoolResponse editSchool(Long id, SchoolRequest request) {
+    public SchoolResponse editSchoolV1(Long id, SchoolRequest request) {
         School school = schoolRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("School not found with ID: " + id));
         school.setName(request.getName());
@@ -52,7 +52,7 @@ public class SchoolServiceImplementation implements SchoolService {
     }
 
     @Override
-    public void deleteSchool(Long id) {
+    public void deleteSchoolV1(Long id) {
         schoolRepository.deleteById(id);
     }
 
