@@ -229,9 +229,21 @@ public class PostServiceImplementation implements PostService {
     }
 
     @Override
-    //softdelete to be implemented
+    @Transactional
     public String deletePostV1(Long postId) {
-        return "";
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
+
+        if ("DELETED".equals(post.getStatus())) {
+            throw new RuntimeException("Post is already deleted");
+        }
+
+        post.setStatus("DELETED");
+        post.setIsLatestVersion(false);
+        post.setUpdatedAt(LocalDateTime.now());
+        postRepository.save(post);
+
+        return "Post deleted successfully";
     }
 
     @Override

@@ -35,9 +35,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     void updateIsLatestVersionByPostId(@Param("postId") Integer postId,
                                        @Param("isLatest") Boolean isLatest);
 
-    @Query("SELECT p FROM Post p WHERE p.post_id = :postId " +
+    @Query(value = "SELECT * FROM posts p WHERE p.post_id = :postId " +
             "AND p.version < :currentVersion AND p.status = 'APPROVED' " +
-            "ORDER BY p.version DESC LIMIT 1")
+            "ORDER BY p.version DESC LIMIT 1", nativeQuery = true)
     Post findPreviousApprovedVersion(@Param("postId") Integer postId,
                                      @Param("currentVersion") Integer currentVersion);
 

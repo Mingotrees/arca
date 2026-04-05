@@ -1,5 +1,6 @@
 package com.popman.arca.controller.v1;
 
+import com.popman.arca.dto.v1.user.UserResponse;
 import com.popman.arca.entity.User;
 import com.popman.arca.service.BannedEmailService;
 import com.popman.arca.service.UserService;
@@ -11,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -30,7 +32,9 @@ public class AdminController {
     @GetMapping("/users")
     public ResponseEntity<?> getAllUsers() {
         try {
-            List<User> users = userService.getAllUserV1();
+            List<UserResponse> users = userService.getAllUserV1().stream()
+                    .map(this::mapToUserResponse)
+                    .collect(Collectors.toList());
             logger.info("Admin retrieved {} users", users.size());
             return ResponseEntity.ok(users);
         } catch (Exception e) {
@@ -46,7 +50,7 @@ public class AdminController {
         try {
             User user = userService.getUserV1(id);
             logger.info("Admin retrieved user: {}", id);
-            return ResponseEntity.ok(user);
+            return ResponseEntity.ok(mapToUserResponse(user));
         } catch (Exception e) {
             logger.error("Error retrieving user {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -259,5 +263,19 @@ public class AdminController {
         public String getError() {
             return error;
         }
+    }
+
+    private UserResponse mapToUserResponse(User user) {
+        return new UserResponse(
+                user.getId(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getEmail(),
+                user.getCourse(),
+                user.getDepartment(),
+                user.getBio(),
+                user.getProfilePicture(),
+                user.getRoles()
+        );
     }
 }

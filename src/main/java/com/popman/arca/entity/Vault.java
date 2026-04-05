@@ -5,9 +5,15 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "vaults", indexes = {
-        @Index(name = "idx_vault_id", columnList = "id"),
-})
+@Table(name = "vaults",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_vault_user_post", columnNames = {"user_id", "post_id"})
+        },
+        indexes = {
+                @Index(name = "idx_vault_id", columnList = "id"),
+                @Index(name = "idx_vault_user_id", columnList = "user_id"),
+                @Index(name = "idx_vault_post_id", columnList = "post_id")
+        })
 public class Vault {
 
     @Id
@@ -15,8 +21,8 @@ public class Vault {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
     @JsonIgnore
     private User user;
 

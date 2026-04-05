@@ -1,5 +1,6 @@
 package com.popman.arca.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
@@ -24,6 +25,8 @@ public class User {
 
     private String firstName;
     private String lastName;
+
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     @Column(unique = true, nullable = false)  // Email should be unique and required

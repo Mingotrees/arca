@@ -1,5 +1,6 @@
 package com.popman.arca.service.impl;
 
+import com.popman.arca.dto.v1.auth.RegisterRequest;
 import com.popman.arca.entity.User;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.UserService;
@@ -61,11 +62,20 @@ public class UserServiceImplementation implements UserService {
 
   @Override
   @Transactional
-  public String createUserV1(User user) {
+  public String createUserV1(RegisterRequest registerRequest) {
     try {
-      logger.debug("Creating new user: {}", user.getEmail());
-      validateUser(user);
+      logger.debug("Creating new user: {}", registerRequest.getEmail());
+      validateUser(registerRequest);
+
+      User user = new User();
       user.setId(null);
+      user.setFirstName(registerRequest.getFirstName());
+      user.setLastName(registerRequest.getLastName());
+      user.setEmail(registerRequest.getEmail() != null ? registerRequest.getEmail().trim() : null);
+      user.setPassword(registerRequest.getPassword());
+      user.setCourse(registerRequest.getCourse());
+      user.setDepartment(registerRequest.getDepartment());
+      user.setBio(registerRequest.getBio());
 
       if (userRepository.findByEmail(user.getEmail()) != null) {
         throw new IllegalArgumentException("User with email " + user.getEmail() + " already exists");
@@ -73,12 +83,10 @@ public class UserServiceImplementation implements UserService {
 
       user.setPassword(passwordEncoder.encode(user.getPassword()));
 
-      if (user.getRoles() == null || user.getRoles().isEmpty()) {
-        Set<String> roles = new HashSet<>();
-        roles.add("ROLE_USER");
-        user.setRoles(roles);
-        logger.debug("Assigned default ROLE_USER to new user");
-      }
+      Set<String> roles = new HashSet<>();
+      roles.add("ROLE_USER");
+      user.setRoles(roles);
+      logger.debug("Assigned default ROLE_USER to new user");
 
       User savedUser = userRepository.save(user);
       logger.info("User created successfully with ID: {} and roles: {}",
@@ -415,6 +423,26 @@ public class UserServiceImplementation implements UserService {
     }
 
     validatePassword(user.getPassword());
+  }
+
+  private void validateUser(RegisterRequest registerRequest) {
+    if (registerRequest == null) {
+      throw new IllegalArgumentException("User cannot be null");
+    }
+
+    String email = registerRequest.getEmail();
+    if (email == null || email.trim().isEmpty()) {
+      throw new IllegalArgumentException("Email cannot be null or empty");
+    }
+    if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+      throw new IllegalArgumentException("Invalid email format");
+    }
+    if ((registerRequest.getFirstName() == null || registerRequest.getFirstName().trim().isEmpty()) &&
+        (registerRequest.getLastName() == null || registerRequest.getLastName().trim().isEmpty())) {
+      throw new IllegalArgumentException("At least first name or last name must be provided");
+    }
+
+    validatePassword(registerRequest.getPassword());
   }
 
   private void validateId(Long userId) {

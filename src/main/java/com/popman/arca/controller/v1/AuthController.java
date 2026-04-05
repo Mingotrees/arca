@@ -2,6 +2,7 @@ package com.popman.arca.controller.v1;
 
 import com.popman.arca.dto.v1.auth.AuthResponse;
 import com.popman.arca.dto.v1.auth.LoginRequest;
+import com.popman.arca.dto.v1.auth.RegisterRequest;
 import com.popman.arca.dto.v1.refreshtoken.RefreshTokenRequest;
 import com.popman.arca.entity.RefreshToken;
 import com.popman.arca.entity.User;
@@ -9,6 +10,7 @@ import com.popman.arca.service.JWTService;
 import com.popman.arca.service.BannedEmailService;
 import com.popman.arca.service.RefreshTokenService;
 import com.popman.arca.service.UserService;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -44,16 +46,16 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody User user) {
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest registerRequest) {
         try {
-            if (bannedEmailService.isBannedV1(user.getEmail())) {
+            if (bannedEmailService.isBannedV1(registerRequest.getEmail())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(new ErrorResponse("Registration blocked: email is banned"));
             }
-            String result = userService.createUserV1(user);
+            String result = userService.createUserV1(registerRequest);
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
-                    new RegisterResponse(result, user.getEmail())
+                    new RegisterResponse(result, registerRequest.getEmail())
             );
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)

@@ -86,7 +86,7 @@ public class VaultServiceImplementation implements VaultService {
 
     @Override
     public Optional<Vault> getVaultEntryV1(Long id) {
-        return Optional.empty();
+        return vaultRepository.findById(id);
     }
 
     @Override
