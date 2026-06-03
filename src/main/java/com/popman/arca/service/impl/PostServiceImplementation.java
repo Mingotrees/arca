@@ -7,10 +7,8 @@ import com.popman.arca.dto.v1.post.PostRequest;
 import com.popman.arca.dto.v1.post.PostResponse;
 import com.popman.arca.dto.v1.post.PostUpdateRequest;
 import com.popman.arca.dto.v1.post.PostCreateResponse;
-import com.popman.arca.entity.Department;
 import com.popman.arca.entity.Post;
 import com.popman.arca.entity.Subject;
-import com.popman.arca.entity.User;
 import com.popman.arca.repository.DepartmentRepository;
 import com.popman.arca.repository.PostRepository;
 import com.popman.arca.repository.SubjectRepository;
@@ -70,10 +68,10 @@ public class PostServiceImplementation implements PostService {
     @Override
     @Transactional
     public PostCreateResponse createPostV1(PostRequest request) {
-        User user = userRepository.findById(request.getUserId())
+        userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new RuntimeException ("User not found with Id " + request.getUserId()));
 
-        Department department = departmentRepository.findById(request.getDepartmentId())
+        departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(()-> new RuntimeException("Department not found with id " + request.getDepartmentId()));
 
         Integer nextPostId = postRepository.getNextPostId();
@@ -229,9 +227,12 @@ public class PostServiceImplementation implements PostService {
     }
 
     @Override
-    //softdelete to be implemented
+    @Transactional
     public String deletePostV1(Long postId) {
-        return "";
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
+        postRepository.delete(post);
+        return "Post deleted successfully.";
     }
 
     @Override

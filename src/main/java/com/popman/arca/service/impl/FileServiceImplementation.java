@@ -55,7 +55,9 @@ public class FileServiceImplementation implements FileService {
     Post post = postRepository.findById(postId)
         .orElseThrow(() -> new RuntimeException("Post not found with id " + postId));
 
-    String original = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
+    String original = file.getOriginalFilename() == null
+        ? "file"
+        : Paths.get(file.getOriginalFilename()).getFileName().toString();
     String fileName = System.currentTimeMillis() + "_" + original;
 
     Path postFolder = Paths.get(uploadDir, "posts", String.valueOf(postId)).toAbsolutePath().normalize();
@@ -78,7 +80,9 @@ public class FileServiceImplementation implements FileService {
     fileEntity.setUser(user);
 
     try {
-      return fileRepository.save(fileEntity);
+      File saved = fileRepository.save(fileEntity);
+      logger.info("Uploaded file {} for post {} by user {}", saved.getId(), postId, userId);
+      return saved;
     } catch (RuntimeException e) {
       Files.deleteIfExists(targetLocation); // rollback file if DB save fails
       throw new RuntimeException("Database save failed: " + e.getMessage(), e);

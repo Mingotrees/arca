@@ -40,7 +40,7 @@ public class VoteServiceImplementation implements VoteService {
                 .orElse(new Vote());
 
 
-        if (vote.getId() != null && vote.getVoteType().equals(request.getVoteType())) {
+        if (vote.getId() != null && request.getVoteType() != null && request.getVoteType().equals(vote.getVoteType())) {
             voteRepository.delete(vote);
             return null;
         }
@@ -67,11 +67,13 @@ public class VoteServiceImplementation implements VoteService {
     }
 
     public Integer getUpvoteCountV1(Long postId) {
-        return voteRepository.countByPostIdAndVoteType(postId, "UPVOTE");
+        Long count = voteRepository.countByPostIdAndVoteType(postId, "UPVOTE");
+        return count == null ? 0 : count.intValue();
     }
 
     public Integer getDownvoteCountV1(Long postId) {
-        return voteRepository.countByPostIdAndVoteType(postId, "DOWNVOTE");
+        Long count = voteRepository.countByPostIdAndVoteType(postId, "DOWNVOTE");
+        return count == null ? 0 : count.intValue();
     }
 
     private VoteResponse convertToDTO(Vote vote) {

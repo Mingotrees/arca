@@ -6,24 +6,41 @@ import com.popman.arca.service.BannedEmailService;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class BannedEmailServiceImplementation implements BannedEmailService {
 
     private static final Logger logger = LoggerFactory.getLogger(BannedEmailServiceImplementation.class);
+    private static final String BAN_CACHE = "bannedEmails.byAddress";
     private final BannedEmailRepository bannedEmailRepository;
+    private final CacheManager cacheManager;
 
-    public BannedEmailServiceImplementation(BannedEmailRepository bannedEmailRepository) {
+    public BannedEmailServiceImplementation(BannedEmailRepository bannedEmailRepository, CacheManager cacheManager) {
         this.bannedEmailRepository = bannedEmailRepository;
+        this.cacheManager = cacheManager;
     }
 
     @Override
     public boolean isBannedV1(String email) {
         if (email == null || email.trim().isEmpty()) return false;
-        return bannedEmailRepository.existsByEmailIgnoreCase(email.trim());
+
+        String normalized = email.trim().toLowerCase();
+        Boolean cached = getCachedValue(normalized);
+        if (cached != null) {
+            logger.debug("Cache hit: banned email check for {}", normalized);
+            return cached;
+        }
+
+        boolean banned = bannedEmailRepository.existsByEmailIgnoreCase(normalized);
+        logger.debug("Cache miss: banned email check for {}", normalized);
+        putCachedValue(normalized, banned);
+        return banned;
     }
 
     @Override
@@ -38,6 +55,7 @@ public class BannedEmailServiceImplementation implements BannedEmailService {
         }
         BannedEmail entry = new BannedEmail(normalized, reason);
         bannedEmailRepository.save(entry);
+        evictCachedValue(normalized);
         logger.info("Banned email: {}", normalized);
         return "Email banned successfully";
     }
@@ -53,6 +71,7 @@ public class BannedEmailServiceImplementation implements BannedEmailService {
             throw new IllegalArgumentException("Email is not banned");
         }
         bannedEmailRepository.deleteByEmailIgnoreCase(normalized);
+        evictCachedValue(normalized);
         logger.info("Unbanned email: {}", normalized);
         return "Email unbanned successfully";
     }
@@ -60,5 +79,22 @@ public class BannedEmailServiceImplementation implements BannedEmailService {
     @Override
     public List<BannedEmail> listAllV1() {
         return bannedEmailRepository.findAll();
+    }
+
+    private Boolean getCachedValue(String normalizedEmail) {
+        Cache cache = cacheManager.getCache(BAN_CACHE);
+        return cache == null ? null : cache.get(normalizedEmail, Boolean.class);
+    }
+
+    private void putCachedValue(String normalizedEmail, boolean banned) {
+        Cache cache = cacheManager.getCache(BAN_CACHE);
+        if (cache != null) {
+            cache.put(normalizedEmail, banned);
+        }
+    }
+
+    private void evictCachedValue(String normalizedEmail) {
+        Optional.ofNullable(cacheManager.getCache(BAN_CACHE))
+                .ifPresent(cache -> cache.evict(normalizedEmail));
     }
 }

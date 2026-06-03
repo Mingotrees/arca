@@ -1,18 +1,21 @@
 package com.popman.arca.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
-@Table(name = "vaults", indexes = {
-        @Index(name = "idx_vault_id", columnList = "id"),
+@Table(name = "vaults", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_vault_user_id", columnNames = {"user_id"})
+}, indexes = {
+        @Index(name = "idx_vault_user_id", columnList = "user_id")
 })
 public class Vault {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
@@ -20,22 +23,24 @@ public class Vault {
     @JsonIgnore
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id", nullable = false)
-    @JsonIgnore
-    private Post post;
-
-    @Column(columnDefinition = "text")
-    private String label;
-
+    @OneToMany(mappedBy = "vault", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<VaultItem> savedPosts = new ArrayList<>();
 
     public Vault() {
     }
 
-    public Vault(User user, Post post, String label) {
+    public Vault(User user) {
         this.user = user;
-        this.post = post;
-        this.label = label;
+    }
+
+    public void addSavedPost(VaultItem vaultItem) {
+        savedPosts.add(vaultItem);
+        vaultItem.setVault(this);
+    }
+
+    public void removeSavedPost(VaultItem vaultItem) {
+        savedPosts.remove(vaultItem);
+        vaultItem.setVault(null);
     }
 
     public Long getId() {
@@ -54,19 +59,7 @@ public class Vault {
         this.user = user;
     }
 
-    public Post getPost() {
-        return post;
-    }
-
-    public void setPost(Post post) {
-        this.post = post;
-    }
-
-    public String getLabel() {
-        return label;
-    }
-
-    public void setLabel(String label) {
-        this.label = label;
+    public List<VaultItem> getSavedPosts() {
+        return savedPosts;
     }
 }

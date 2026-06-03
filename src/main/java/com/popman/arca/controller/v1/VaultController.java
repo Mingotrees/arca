@@ -5,12 +5,11 @@ import com.popman.arca.dto.v1.vault.EditVaultLabelRequest;
 import com.popman.arca.dto.v1.vault.VaultRequest;
 import com.popman.arca.entity.UserPrincipal;
 import com.popman.arca.entity.Vault;
+import com.popman.arca.entity.VaultItem;
 import com.popman.arca.service.VaultService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("api/v1/vaults")
@@ -26,8 +25,8 @@ public class VaultController {
     public ResponseEntity<?> addToVault(@AuthenticationPrincipal UserPrincipal userDetails,@RequestBody VaultRequest request){
         try {
             Long userId = userDetails.getId();
-            Vault savedVault = vaultService.addToVaultV1(userId, request.getPostId(),request.getLabel());
-            return ResponseEntity.ok("Post successfully added to Vault.");
+            Vault vault = vaultService.addToVaultV1(userId, request.getPostId(),request.getLabel());
+            return ResponseEntity.ok(vault);
         }catch (RuntimeException e){
             return ResponseEntity.badRequest().body(e.getMessage());
         }catch (Exception e){
@@ -55,9 +54,9 @@ public class VaultController {
 
         try {
             Long userId = userDetails.getId();
-            Vault updatedVault = vaultService.editLabelV1(userId, request.getPostId(), request.getNewLabel());
+            VaultItem updatedVaultItem = vaultService.editLabelV1(userId, request.getPostId(), request.getNewLabel());
 
-            return ResponseEntity.ok(updatedVault);
+            return ResponseEntity.ok(updatedVaultItem);
         }catch (RuntimeException e){
             return ResponseEntity.badRequest().body(e.getMessage());
         }catch (Exception e){
@@ -70,18 +69,15 @@ public class VaultController {
 
         try {
             Long userId = userDetails.getId();
-            List<Vault> vaultList = vaultService.getUserVaultV1(userId);
-            if(vaultList.isEmpty()){
-                return ResponseEntity.ok("Vault is empty for this user");
-            }
-            return ResponseEntity.ok(vaultList);
+            Vault vault = vaultService.getUserVaultV1(userId);
+            return ResponseEntity.ok(vault);
         }catch (Exception e){
             return ResponseEntity.internalServerError().body("Failed to fetch user vault");
         }
     }
 
     @GetMapping("/check")
-    public ResponseEntity<?> isPostSaved(@AuthenticationPrincipal UserPrincipal userDetails, @RequestBody Long postId){
+    public ResponseEntity<?> isPostSaved(@AuthenticationPrincipal UserPrincipal userDetails, @RequestParam Long postId){
 
         try {
             Long userId = userDetails.getId();
