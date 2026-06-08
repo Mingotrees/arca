@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 import java.util.Optional;
@@ -54,10 +55,17 @@ public class BannedEmailServiceImplementation implements BannedEmailService {
             throw new IllegalArgumentException("Email is already banned");
         }
         BannedEmail entry = new BannedEmail(normalized, reason);
-        bannedEmailRepository.save(entry);
-        evictCachedValue(normalized);
-        logger.info("Banned email: {}", normalized);
-        return "Email banned successfully";
+        try {
+            bannedEmailRepository.saveAndFlush(entry);
+            evictCachedValue(normalized);
+            logger.info("Banned email: {}", normalized);
+            return "Email banned successfully";
+        } catch (DataIntegrityViolationException ex) {
+            // Already banned by concurrent request
+            evictCachedValue(normalized);
+            logger.warn("Attempted to ban already-banned email: {}", normalized);
+            throw new IllegalArgumentException("Email is already banned");
+        }
     }
 
     @Override

@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -80,11 +81,15 @@ public class UserServiceImplementation implements UserService {
         logger.debug("Assigned default ROLE_USER to new user");
       }
 
-      User savedUser = userRepository.save(user);
-      logger.info("User created successfully with ID: {} and roles: {}",
-          savedUser.getId(), savedUser.getRoles());
-
-      return "User created successfully with ID: " + savedUser.getId();
+      try {
+        User savedUser = userRepository.saveAndFlush(user);
+        logger.info("User created successfully with ID: {} and roles: {}",
+            savedUser.getId(), savedUser.getRoles());
+        return "User created successfully with ID: " + savedUser.getId();
+      } catch (DataIntegrityViolationException ex) {
+        logger.warn("User creation failed due to unique constraint for email {}", user.getEmail());
+        throw new IllegalArgumentException("User with email " + user.getEmail() + " already exists");
+      }
     } catch (IllegalArgumentException e) {
       logger.error("Validation error creating user: {}", e.getMessage());
       throw e;
@@ -113,11 +118,15 @@ public class UserServiceImplementation implements UserService {
       roles.add("ROLE_ADMIN");
       user.setRoles(roles);
 
-      User savedUser = userRepository.save(user);
-      logger.info("Admin created successfully with ID: {} and roles: {}",
-          savedUser.getId(), savedUser.getRoles());
-
-      return "Admin created successfully with ID: " + savedUser.getId();
+      try {
+        User savedUser = userRepository.saveAndFlush(user);
+        logger.info("Admin created successfully with ID: {} and roles: {}",
+            savedUser.getId(), savedUser.getRoles());
+        return "Admin created successfully with ID: " + savedUser.getId();
+      } catch (DataIntegrityViolationException ex) {
+        logger.warn("Admin creation failed due to unique constraint for email {}", user.getEmail());
+        throw new IllegalArgumentException("User with email " + user.getEmail() + " already exists");
+      }
     } catch (IllegalArgumentException e) {
       logger.error("Validation error creating admin: {}", e.getMessage());
       throw e;

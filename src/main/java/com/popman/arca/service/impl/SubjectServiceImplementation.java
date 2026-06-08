@@ -8,6 +8,7 @@ import com.popman.arca.repository.DepartmentRepository;
 import com.popman.arca.repository.SubjectRepository;
 import com.popman.arca.service.SubjectService;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,7 +56,18 @@ public class SubjectServiceImplementation implements SubjectService{
             .collect(Collectors.toList());
 
         subject.setListDepartments(attachedDepartments);
-        return subjectRepository.save(subject);
+        try {
+            return subjectRepository.saveAndFlush(subject);
+        } catch (DataIntegrityViolationException ex) {
+            // Convert DB unique constraint to a clearer message
+            if (subjectRepository.existsByCode(request.getCode())) {
+                throw new RuntimeException("Subject with code : " + request.getCode() + " already exists");
+            }
+            if (subjectRepository.existsByName(request.getName())) {
+                throw new RuntimeException("Subject with name : " + request.getName() + " already exists");
+            }
+            throw ex;
+        }
     }
 
     @Override

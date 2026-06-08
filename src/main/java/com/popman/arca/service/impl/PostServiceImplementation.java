@@ -74,7 +74,13 @@ public class PostServiceImplementation implements PostService {
         departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(()-> new RuntimeException("Department not found with id " + request.getDepartmentId()));
 
-        Integer nextPostId = postRepository.getNextPostId();
+        Integer nextPostId;
+        try {
+            nextPostId = postRepository.getNextPostIdFromSequence();
+        } catch (Exception e) {
+            // Sequence might not exist in older deployments; fall back to previous MAX() approach
+            nextPostId = postRepository.getNextPostId();
+        }
 
         Post post = new Post();
         post.setPost_id(nextPostId);
