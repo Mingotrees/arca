@@ -14,7 +14,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("SELECT COALESCE(MAX(p.post_id), 0) + 1 FROM Post p")
     Integer getNextPostId();
 
-    @Query(value = "SELECT nextval('post_id_seq')", nativeQuery = true)
+    @Query(value = "SELECT COALESCE(MAX(post_id), 0) + 1 FROM posts", nativeQuery = true)
     Integer getNextPostIdFromSequence();
 
     @Query("SELECT MAX(p.version) FROM Post p WHERE p.post_id = :postId")
