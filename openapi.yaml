@@ -1,0 +1,1463 @@
+openapi: 3.1.0
+info:
+  title: OpenAPI definition
+  version: v0
+servers:
+- url: http://localhost:8080
+  description: Generated server url
+paths:
+  /api/v1/vaults/edit-label:
+    put:
+      tags:
+      - vault-controller
+      operationId: editLabel
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditVaultLabelRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/user/{userId}:
+    get:
+      tags:
+      - user-controller
+      operationId: getUserDetails
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      tags:
+      - user-controller
+      operationId: updateUser
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+    delete:
+      tags:
+      - user-controller
+      operationId: deleteUser
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+  /api/v1/user/{userId}/profile-picture:
+    put:
+      tags:
+      - user-controller
+      operationId: updateProfilePicture
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProfilePictureResponse"
+  /api/v1/subject/{subjectId}:
+    get:
+      tags:
+      - subject-controller
+      operationId: getSubjectDetails
+      parameters:
+      - name: subjectId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SubjectResponse"
+    put:
+      tags:
+      - subject-controller
+      operationId: updateSubject
+      parameters:
+      - name: subjectId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubjectRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SubjectResponse"
+    delete:
+      tags:
+      - subject-controller
+      operationId: deleteSubject
+      parameters:
+      - name: subjectId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+  /api/v1/schools/edit/{id}:
+    put:
+      tags:
+      - school-controller
+      operationId: editSchool
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SchoolRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/posts/{postId}:
+    get:
+      tags:
+      - post-controller
+      operationId: getPost
+      parameters:
+      - name: postId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PostResponse"
+    put:
+      tags:
+      - post-controller
+      operationId: updatePost
+      parameters:
+      - name: postId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostUpdateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+    delete:
+      tags:
+      - post-controller
+      operationId: deletePost
+      parameters:
+      - name: postId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+  /api/v1/departments/{id}:
+    get:
+      tags:
+      - department-controller
+      operationId: getDepartment
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DepartmentDetailResponse"
+    put:
+      tags:
+      - department-controller
+      operationId: updateDepartment
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepartmentRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DepartmentDetailResponse"
+    delete:
+      tags:
+      - department-controller
+      operationId: deleteDepartment
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+  /api/v1/admin/users/{id}/roles/remove:
+    put:
+      tags:
+      - admin-controller
+      operationId: removeRole
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/admin/users/{id}/roles/add:
+    put:
+      tags:
+      - admin-controller
+      operationId: addRole
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/admin/users/{id}/promote:
+    put:
+      tags:
+      - admin-controller
+      operationId: promoteToAdmin
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/admin/users/{id}/demote:
+    put:
+      tags:
+      - admin-controller
+      operationId: demoteFromAdmin
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/votes:
+    post:
+      tags:
+      - vote-controller
+      operationId: vote
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/VoteResponse"
+  /api/v1/vaults/add:
+    post:
+      tags:
+      - vault-controller
+      operationId: addToVault
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VaultRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/user:
+    get:
+      tags:
+      - user-controller
+      operationId: getAllUser
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      tags:
+      - user-controller
+      operationId: createUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+  /api/v1/subject:
+    get:
+      tags:
+      - subject-controller
+      operationId: getAllSubjects
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SubjectResponse"
+    post:
+      tags:
+      - subject-controller
+      operationId: createSubject
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubjectRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SubjectResponse"
+  /api/v1/schools:
+    get:
+      tags:
+      - school-controller
+      operationId: getAllSchools
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+    post:
+      tags:
+      - school-controller
+      operationId: addSchool
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SchoolRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/posts:
+    post:
+      tags:
+      - post-controller
+      operationId: createPost
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PostCreateResponse"
+  /api/v1/posts/{postId}/approve:
+    post:
+      tags:
+      - post-controller
+      operationId: approvePost
+      parameters:
+      - name: postId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostApprovalRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+  /api/v1/files/upload:
+    post:
+      tags:
+      - file-controller
+      operationId: uploadFile
+      parameters:
+      - name: user_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: post_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+              required:
+              - file
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MultipleFileUploadRequest"
+  /api/v1/departments:
+    get:
+      tags:
+      - department-controller
+      operationId: getAllDepartments
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DepartmentDetailResponse"
+    post:
+      tags:
+      - department-controller
+      operationId: createDepartment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepartmentRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DepartmentDetailResponse"
+  /api/v1/auth/register:
+    post:
+      tags:
+      - auth-controller
+      operationId: register
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/auth/refresh:
+    post:
+      tags:
+      - auth-controller
+      operationId: refreshToken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/auth/logout:
+    post:
+      tags:
+      - auth-controller
+      operationId: logout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/auth/login:
+    post:
+      tags:
+      - auth-controller
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/admin/create-admin:
+    post:
+      tags:
+      - admin-controller
+      operationId: createAdmin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/admin/banned-emails:
+    get:
+      tags:
+      - admin-controller
+      operationId: listBannedEmails
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+    post:
+      tags:
+      - admin-controller
+      operationId: banEmail
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BanEmailRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/votes/{postId}/upvotes:
+    get:
+      tags:
+      - vote-controller
+      operationId: getUpvoteCount
+      parameters:
+      - name: postId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: integer
+                format: int32
+  /api/v1/votes/{postId}/my-vote:
+    get:
+      tags:
+      - vote-controller
+      operationId: getMyVote
+      parameters:
+      - name: postId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/VoteResponse"
+  /api/v1/votes/{postId}/downvotes:
+    get:
+      tags:
+      - vote-controller
+      operationId: getDownvoteCount
+      parameters:
+      - name: postId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: integer
+                format: int32
+  /api/v1/vaults/{id}:
+    get:
+      tags:
+      - vault-controller
+      operationId: getVaultEntry
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/vaults/user:
+    get:
+      tags:
+      - vault-controller
+      operationId: getUserVault
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/vaults/check:
+    get:
+      tags:
+      - vault-controller
+      operationId: isPostSaved
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: integer
+              format: int64
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/posts/user/{userId}:
+    get:
+      tags:
+      - post-controller
+      operationId: getAllUserPost
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostResponse"
+  /api/v1/posts/pending:
+    get:
+      tags:
+      - post-controller
+      operationId: getAllPendingApprovalPosts
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostResponse"
+  /api/v1/posts/pending/department/{departmentId}:
+    get:
+      tags:
+      - post-controller
+      operationId: getPendingPostsByDepartment
+      parameters:
+      - name: departmentId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostResponse"
+  /api/v1/posts/history/{postId}:
+    get:
+      tags:
+      - post-controller
+      operationId: getPostHistory
+      parameters:
+      - name: postId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostResponse"
+  /api/v1/posts/department/{departmentId}:
+    get:
+      tags:
+      - post-controller
+      operationId: getAllDepartmentPost
+      parameters:
+      - name: departmentId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostResponse"
+  /api/v1/files/{id}:
+    get:
+      tags:
+      - file-controller
+      operationId: getFileInfo
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/FileUploadRequest"
+  /api/v1/files/download/{id}:
+    get:
+      tags:
+      - file-controller
+      operationId: downloadFile
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+  /api/v1/admin/users:
+    get:
+      tags:
+      - admin-controller
+      operationId: getAllUsers
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/admin/users/{id}:
+    get:
+      tags:
+      - admin-controller
+      operationId: getUser
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+    delete:
+      tags:
+      - admin-controller
+      operationId: deleteUser_1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/votes/{postId}:
+    delete:
+      tags:
+      - vote-controller
+      operationId: removeVote
+      parameters:
+      - name: postId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+  /api/v1/vaults/remove:
+    delete:
+      tags:
+      - vault-controller
+      operationId: removeFromVault
+      parameters:
+      - name: postId
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/schools/delete/{id}:
+    delete:
+      tags:
+      - school-controller
+      operationId: deleteSchool
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/admin/banned-emails/{email}:
+    delete:
+      tags:
+      - admin-controller
+      operationId: unbanEmail
+      parameters:
+      - name: email
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+components:
+  schemas:
+    EditVaultLabelRequest:
+      type: object
+      properties:
+        postId:
+          type: integer
+          format: int64
+        newLabel:
+          type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        firstName:
+          type: string
+        lastName:
+          type: string
+        password:
+          type: string
+        email:
+          type: string
+        course:
+          type: string
+        department:
+          type: string
+        bio:
+          type: string
+        profilePicture:
+          type: string
+        deletedAt:
+          type: string
+          format: date-time
+        roles:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+        deleted:
+          type: boolean
+    ProfilePictureResponse:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        profilePicture:
+          type: string
+        message:
+          type: string
+    SubjectRequest:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        departmentIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+    DepartmentResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+    SubjectResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        code:
+          type: string
+        name:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        departments:
+          type: array
+          items:
+            $ref: "#/components/schemas/DepartmentResponse"
+    SchoolRequest:
+      type: object
+      properties:
+        name:
+          type: string
+    PostUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 30
+          minLength: 0
+        content:
+          type: string
+        postTag:
+          type: string
+    DepartmentRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        schoolId:
+          type: integer
+          format: int64
+        schoolName:
+          type: string
+    DepartmentDetailResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        schoolId:
+          type: integer
+          format: int64
+        schoolName:
+          type: string
+    RoleRequest:
+      type: object
+      properties:
+        role:
+          type: string
+    VoteRequest:
+      type: object
+      properties:
+        postId:
+          type: integer
+          format: int64
+        voteType:
+          type: string
+    VoteResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        postId:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        voteType:
+          type: string
+    VaultRequest:
+      type: object
+      properties:
+        postId:
+          type: integer
+          format: int64
+        label:
+          type: string
+    PostRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 30
+          minLength: 0
+        content:
+          type: string
+          minLength: 1
+        userId:
+          type: integer
+          format: int64
+        departmentId:
+          type: integer
+          format: int64
+        postTag:
+          type: string
+      required:
+      - content
+      - departmentId
+      - title
+      - userId
+    PostCreateResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        post_id:
+          type: integer
+          format: int32
+        message:
+          type: string
+    PostApprovalRequest:
+      type: object
+      properties:
+        approved:
+          type: boolean
+        rejectionReason:
+          type: string
+      required:
+      - approved
+    FileUploadRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        fileName:
+          type: string
+        fileType:
+          type: string
+        fileSize:
+          type: integer
+          format: int64
+        filePath:
+          type: string
+        userId:
+          type: integer
+          format: int64
+        postId:
+          type: integer
+          format: int64
+        message:
+          type: string
+    MultipleFileUploadRequest:
+      type: object
+      properties:
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileUploadRequest"
+        message:
+          type: string
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+    BanEmailRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        reason:
+          type: string
+    FileResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        fileName:
+          type: string
+        fileType:
+          type: string
+        fileSize:
+          type: integer
+          format: int64
+        downloadUrl:
+          type: string
+    PostResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        postId:
+          type: integer
+          format: int32
+        version:
+          type: integer
+          format: int32
+        title:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+        userId:
+          type: integer
+          format: int64
+        firstName:
+          type: string
+        lastName:
+          type: string
+        departmentId:
+          type: integer
+          format: int64
+        departmentName:
+          type: string
+        postTag:
+          type: string
+        rejectionReason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        upvoteCount:
+          type: integer
+          format: int32
+        downvoteCount:
+          type: integer
+          format: int32
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileResponse"
+        isLatestVersion:
+          type: boolean
+        latestVersion:
+          type: boolean
