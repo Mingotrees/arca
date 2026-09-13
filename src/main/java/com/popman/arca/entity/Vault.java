@@ -7,6 +7,8 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "vaults", indexes = {
         @Index(name = "idx_vault_id", columnList = "id"),
+}, uniqueConstraints = {
+        @UniqueConstraint(name = "uk_vault_user_post", columnNames = {"user_id", "post_id"})
 })
 public class Vault {
 
@@ -15,8 +17,8 @@ public class Vault {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
     @JsonIgnore
     private User user;
 

@@ -1,8 +1,15 @@
 package com.popman.arca.controller.v1;
 
+import com.popman.arca.dto.v1.admin.BannedEmailResponse;
+import com.popman.arca.dto.v1.common.MessageResponse;
+import com.popman.arca.dto.v1.user.UserResponse;
 import com.popman.arca.entity.User;
 import com.popman.arca.service.BannedEmailService;
 import com.popman.arca.service.UserService;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -28,11 +35,13 @@ public class AdminController {
 
     // Get all users (admin only)
     @GetMapping("/users")
+    @ApiResponse(responseCode = "200", description = "Users",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = UserResponse.class))))
     public ResponseEntity<?> getAllUsers() {
         try {
             List<User> users = userService.getAllUserV1();
             logger.info("Admin retrieved {} users", users.size());
-            return ResponseEntity.ok(users);
+            return ResponseEntity.ok(users.stream().map(UserResponse::new).toList());
         } catch (Exception e) {
             logger.error("Error retrieving users: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -42,11 +51,13 @@ public class AdminController {
 
     // Get specific user
     @GetMapping("/users/{id}")
+    @ApiResponse(responseCode = "200", description = "User",
+            content = @Content(schema = @Schema(implementation = UserResponse.class)))
     public ResponseEntity<?> getUser(@PathVariable Long id) {
         try {
             User user = userService.getUserV1(id);
             logger.info("Admin retrieved user: {}", id);
-            return ResponseEntity.ok(user);
+            return ResponseEntity.ok(new UserResponse(user));
         } catch (Exception e) {
             logger.error("Error retrieving user {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -56,12 +67,14 @@ public class AdminController {
 
     // Create admin user
     @PostMapping("/create-admin")
+    @ApiResponse(responseCode = "201", description = "Admin created",
+            content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     public ResponseEntity<?> createAdmin(@RequestBody User user) {
         try {
             String result = userService.createAdminV1(user);
             logger.info("Admin created new admin user: {}", user.getEmail());
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new SuccessResponse(result));
+                    .body(new MessageResponse(result));
         } catch (IllegalArgumentException e) {
             logger.warn("Failed to create admin: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -75,11 +88,13 @@ public class AdminController {
 
     // Promote user to admin
     @PutMapping("/users/{id}/promote")
+    @ApiResponse(responseCode = "200", description = "User promoted",
+            content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     public ResponseEntity<?> promoteToAdmin(@PathVariable Long id) {
         try {
             String result = userService.promoteToAdminV1(id);
             logger.info("User {} promoted to admin", id);
-            return ResponseEntity.ok(new SuccessResponse(result));
+            return ResponseEntity.ok(new MessageResponse(result));
         } catch (IllegalArgumentException e) {
             logger.warn("Failed to promote user {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -93,11 +108,13 @@ public class AdminController {
 
     // Demote admin to regular user
     @PutMapping("/users/{id}/demote")
+    @ApiResponse(responseCode = "200", description = "User demoted",
+            content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     public ResponseEntity<?> demoteFromAdmin(@PathVariable Long id) {
         try {
             String result = userService.demoteFromAdminV1(id);
             logger.info("User {} demoted from admin", id);
-            return ResponseEntity.ok(new SuccessResponse(result));
+            return ResponseEntity.ok(new MessageResponse(result));
         } catch (IllegalArgumentException e) {
             logger.warn("Failed to demote user {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -111,11 +128,13 @@ public class AdminController {
 
     // Add custom role to user
     @PutMapping("/users/{id}/roles/add")
+    @ApiResponse(responseCode = "200", description = "Role added",
+            content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     public ResponseEntity<?> addRole(@PathVariable Long id, @RequestBody RoleRequest roleRequest) {
         try {
             String result = userService.addRoleToUserV1(id, roleRequest.getRole());
             logger.info("Role {} added to user {}", roleRequest.getRole(), id);
-            return ResponseEntity.ok(new SuccessResponse(result));
+            return ResponseEntity.ok(new MessageResponse(result));
         } catch (IllegalArgumentException e) {
             logger.warn("Failed to add role to user {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -129,11 +148,13 @@ public class AdminController {
 
     // Remove role from user
     @PutMapping("/users/{id}/roles/remove")
+    @ApiResponse(responseCode = "200", description = "Role removed",
+            content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     public ResponseEntity<?> removeRole(@PathVariable Long id, @RequestBody RoleRequest roleRequest) {
         try {
             String result = userService.removeRoleFromUserV1(id, roleRequest.getRole());
             logger.info("Role {} removed from user {}", roleRequest.getRole(), id);
-            return ResponseEntity.ok(new SuccessResponse(result));
+            return ResponseEntity.ok(new MessageResponse(result));
         } catch (IllegalArgumentException e) {
             logger.warn("Failed to remove role from user {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -147,11 +168,13 @@ public class AdminController {
 
     // Delete user (soft delete)
     @DeleteMapping("/users/{id}")
+    @ApiResponse(responseCode = "200", description = "User deleted",
+            content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
         try {
             String result = userService.deleteUserv1(id);
             logger.info("User {} deleted by admin", id);
-            return ResponseEntity.ok(new SuccessResponse(result));
+            return ResponseEntity.ok(new MessageResponse(result));
         } catch (IllegalArgumentException e) {
             logger.warn("Failed to delete user {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -165,9 +188,11 @@ public class AdminController {
 
     // Banned email management
     @GetMapping("/banned-emails")
+    @ApiResponse(responseCode = "200", description = "Banned emails",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = BannedEmailResponse.class))))
     public ResponseEntity<?> listBannedEmails() {
         try {
-            return ResponseEntity.ok(bannedEmailService.listAllV1());
+            return ResponseEntity.ok(bannedEmailService.listAllV1().stream().map(BannedEmailResponse::new).toList());
         } catch (Exception e) {
             logger.error("Error listing banned emails: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -176,10 +201,12 @@ public class AdminController {
     }
 
     @PostMapping("/banned-emails")
+    @ApiResponse(responseCode = "201", description = "Email banned",
+            content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     public ResponseEntity<?> banEmail(@RequestBody BanEmailRequest request) {
         try {
             String msg = bannedEmailService.banV1(request.getEmail(), request.getReason());
-            return ResponseEntity.status(HttpStatus.CREATED).body(new SuccessResponse(msg));
+            return ResponseEntity.status(HttpStatus.CREATED).body(new MessageResponse(msg));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(e.getMessage()));
         } catch (Exception e) {
@@ -190,10 +217,12 @@ public class AdminController {
     }
 
     @DeleteMapping("/banned-emails/{email}")
+    @ApiResponse(responseCode = "200", description = "Email unbanned",
+            content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     public ResponseEntity<?> unbanEmail(@PathVariable String email) {
         try {
             String msg = bannedEmailService.unbanV1(email);
-            return ResponseEntity.ok(new SuccessResponse(msg));
+            return ResponseEntity.ok(new MessageResponse(msg));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(e.getMessage()));
         } catch (Exception e) {
@@ -234,18 +263,6 @@ public class AdminController {
 
         public void setReason(String reason) {
             this.reason = reason;
-        }
-    }
-
-    private static class SuccessResponse {
-        private String message;
-
-        public SuccessResponse(String message) {
-            this.message = message;
-        }
-
-        public String getMessage() {
-            return message;
         }
     }
 

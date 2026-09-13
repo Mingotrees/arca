@@ -9,6 +9,7 @@ import com.popman.arca.service.SchoolService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,7 +32,7 @@ public class SchoolServiceImplementation implements SchoolService {
     @Override
     public SchoolResponse getSchoolV1(Long id) {
         School school = schoolRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("School not found with ID: " + id));
+                .orElseThrow(() -> new NoSuchElementException("School not found with ID: " + id));
         return mapToResponse(school);
     }
 
@@ -46,7 +47,7 @@ public class SchoolServiceImplementation implements SchoolService {
     @Override
     public SchoolResponse editSchoolV1(Long id, SchoolRequest request) {
         School school = schoolRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("School not found with ID: " + id));
+                .orElseThrow(() -> new NoSuchElementException("School not found with ID: " + id));
         school.setName(request.getName());
         return mapToResponse(schoolRepository.save(school));
     }
@@ -61,7 +62,7 @@ public class SchoolServiceImplementation implements SchoolService {
                 ? school.getDepartments().stream()
                 .map(dept -> new DepartmentResponse(dept.getId(), dept.getName()))
                 .collect(Collectors.toList())
-                : null;
+                : List.of();
 
         return new SchoolResponse(school.getId(), school.getName(), deptResponses);
     }

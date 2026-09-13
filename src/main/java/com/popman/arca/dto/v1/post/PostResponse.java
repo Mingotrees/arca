@@ -1,5 +1,6 @@
 package com.popman.arca.dto.v1.post;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.popman.arca.dto.v1.file.FileResponse;
 
 import java.time.LocalDateTime;
@@ -19,8 +20,10 @@ public class PostResponse {
     private String departmentName;
 
     private String postTag;
+    private List<PostSubjectResponse> subjects;
     private String rejectionReason;
-    private Boolean IsLatestVersion;
+    @JsonProperty("is_latest_version")
+    private Boolean isLatestVersion;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -29,14 +32,6 @@ public class PostResponse {
     private List<FileResponse> files;
 
     public PostResponse() {}
-
-    public Boolean getLatestVersion() {
-        return IsLatestVersion;
-    }
-
-    public void setLatestVersion(Boolean latestVersion) {
-        IsLatestVersion = latestVersion;
-    }
 
     public Integer getUpvoteCount() {
         return upvoteCount;
@@ -150,6 +145,14 @@ public class PostResponse {
         this.postTag = postTag;
     }
 
+    public List<PostSubjectResponse> getSubjects() {
+        return subjects;
+    }
+
+    public void setSubjects(List<PostSubjectResponse> subjects) {
+        this.subjects = subjects;
+    }
+
     public String getRejectionReason() {
         return rejectionReason;
     }
@@ -158,12 +161,14 @@ public class PostResponse {
         this.rejectionReason = rejectionReason;
     }
 
+    @JsonProperty("is_latest_version")
     public Boolean getIsLatestVersion() {
-        return IsLatestVersion;
+        return isLatestVersion;
     }
 
+    @JsonProperty("is_latest_version")
     public void setIsLatestVersion(Boolean latestVersion) {
-        IsLatestVersion = latestVersion;
+        isLatestVersion = latestVersion;
     }
 
     public LocalDateTime getCreatedAt() {

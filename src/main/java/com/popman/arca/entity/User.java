@@ -1,5 +1,7 @@
 package com.popman.arca.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
@@ -24,6 +26,7 @@ public class User {
 
     private String firstName;
     private String lastName;
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     @Column(unique = true, nullable = false)  // Email should be unique and required
@@ -37,8 +40,10 @@ public class User {
     private String bio;
     private String profilePicture;
 
+    @JsonIgnore
     @Column(name = "is_deleted")
     private boolean isDeleted = false;
+    @JsonIgnore
     private LocalDateTime deletedAt;
 
     // Store multiple roles per user

@@ -69,14 +69,6 @@ public class Post {
 
     public Post() {}
 
-    public Boolean getLatestVersion() {
-        return isLatestVersion;
-    }
-
-    public void setLatestVersion(Boolean latestVersion) {
-        isLatestVersion = latestVersion;
-    }
-
     public List<File> getFiles() {
         return files;
     }

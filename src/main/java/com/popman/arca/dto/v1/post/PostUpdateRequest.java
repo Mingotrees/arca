@@ -2,8 +2,6 @@ package com.popman.arca.dto.v1.post;
 
 import jakarta.validation.constraints.Size;
 
-import java.util.List;
-
 public class PostUpdateRequest {
     @Size(max = 30, message = "Title must not exceed 30 characters")
     private String title;

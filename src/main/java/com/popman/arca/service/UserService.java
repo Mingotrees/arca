@@ -1,5 +1,7 @@
 package com.popman.arca.service;
 
+import com.popman.arca.dto.v1.user.ProfilePictureContent;
+import com.popman.arca.dto.v1.user.UserUpdateRequest;
 import com.popman.arca.entity.User;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -8,8 +10,9 @@ import java.util.List;
 public interface UserService {
     User getUserV1(Long userId);
     List<User> getAllUserV1();
+    List<User> searchUsersV1(String query);
     String createUserV1(User user);
-    String updateUserV1(User user);
+    String updateUserV1(Long userId, UserUpdateRequest request);
     String deleteUserv1(Long userId);
 
     String createAdminV1(User user);
@@ -19,4 +22,5 @@ public interface UserService {
     String removeRoleFromUserV1(Long userId, String role);
 
     String updateProfilePictureV1(Long userId, MultipartFile file);
+    ProfilePictureContent getProfilePictureV1(Long userId);
 }

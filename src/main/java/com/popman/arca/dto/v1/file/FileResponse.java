@@ -14,7 +14,7 @@ public class FileResponse {
         this.fileName = fileName;
         this.fileType = fileType;
         this.fileSize = fileSize;
-        this.downloadUrl = "/api/files/" + id + "/download";
+        this.downloadUrl = "/api/v1/files/download/" + id;
     }
 
     public Long getId() {

@@ -5,12 +5,12 @@ import com.popman.arca.dto.v1.file.FileResponse;
 import com.popman.arca.dto.v1.post.PostApprovalRequest;
 import com.popman.arca.dto.v1.post.PostRequest;
 import com.popman.arca.dto.v1.post.PostResponse;
+import com.popman.arca.dto.v1.post.PostSubjectResponse;
 import com.popman.arca.dto.v1.post.PostUpdateRequest;
 import com.popman.arca.dto.v1.post.PostCreateResponse;
-import com.popman.arca.entity.Department;
+import com.popman.arca.dto.v1.post.PostUpdateResponse;
 import com.popman.arca.entity.Post;
 import com.popman.arca.entity.Subject;
-import com.popman.arca.entity.User;
 import com.popman.arca.repository.DepartmentRepository;
 import com.popman.arca.repository.PostRepository;
 import com.popman.arca.repository.SubjectRepository;
@@ -18,11 +18,16 @@ import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.PostService;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -45,10 +50,38 @@ public class PostServiceImplementation implements PostService {
     private SubjectRepository subjectRepository;
 
     @Override
-    public PostResponse getPostV1(Long postId) {
-        Post post = postRepository.findById(postId)
-                .orElseThrow(()-> new RuntimeException("Post not found with id: " + postId));
+    public PostResponse getPostV1(Long rowId, Long actorId, boolean isAdmin) {
+        Post post = postRepository.findById(rowId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Post not found with id: " + rowId));
+        if (!"APPROVED".equals(post.getStatus()) && !isAdmin && !post.getUserId().equals(actorId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Post is not available to this user");
+        }
         return mapToResponse(post);
+    }
+
+    @Override
+    public List<PostResponse> getAllPostsV1() {
+        return postRepository.findLatestApprovedPosts().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<PostResponse> getPostsBySubjectV1(Long subjectId) {
+        return postRepository.findLatestApprovedPostsBySubjectId(subjectId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<PostResponse> getMyPostsV1(Long actorId, String status) {
+        List<Post> posts = status == null || status.isBlank()
+                ? postRepository.findAllPostsByUserId(actorId)
+                : postRepository.findAllPostsByUserIdAndStatus(actorId, status.toUpperCase(Locale.ROOT));
+        return posts.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -69,19 +102,19 @@ public class PostServiceImplementation implements PostService {
 
     @Override
     @Transactional
-    public PostCreateResponse createPostV1(PostRequest request) {
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new RuntimeException ("User not found with Id " + request.getUserId()));
+    public PostCreateResponse createPostV1(PostRequest request, Long actorId) {
+        userRepository.findById(actorId)
+                .orElseThrow(() -> new NoSuchElementException("User not found with Id " + actorId));
 
-        Department department = departmentRepository.findById(request.getDepartmentId())
-                .orElseThrow(()-> new RuntimeException("Department not found with id " + request.getDepartmentId()));
+        departmentRepository.findById(request.getDepartmentId())
+                .orElseThrow(()-> new NoSuchElementException("Department not found with id " + request.getDepartmentId()));
 
         Integer nextPostId = postRepository.getNextPostId();
 
         Post post = new Post();
         post.setPost_id(nextPostId);
         post.setContent(request.getContent());
-        post.setUserId(request.getUserId());
+        post.setUserId(actorId);
         post.setTitle(request.getTitle());
         post.setVersion(1);
         post.setDepartmentId(request.getDepartmentId());
@@ -92,13 +125,13 @@ public class PostServiceImplementation implements PostService {
 
         if(request.getPostTag() != null && !request.getPostTag().isEmpty()){
             Subject subject = subjectRepository.findById(Long.parseLong(request.getPostTag()))
-                    .orElseThrow(() -> new RuntimeException("Subject not found with id: " + request.getPostTag()));
+                    .orElseThrow(() -> new NoSuchElementException("Subject not found with id: " + request.getPostTag()));
             
             boolean belongsToDepartment = subject.getListDepartments().stream()
                     .anyMatch(dept -> dept.getId().equals(request.getDepartmentId()));
             
             if(!belongsToDepartment){
-                throw new RuntimeException("Subject does not belong to the department id " + request.getDepartmentId());
+                throw new IllegalArgumentException("Subject does not belong to the department id " + request.getDepartmentId());
             }
             Set<Subject> subjects = new HashSet<>();
             subjects.add(subject);
@@ -107,17 +140,17 @@ public class PostServiceImplementation implements PostService {
         postRepository.save(post);
 
         String message = "Post created successfully with Id " + post.getId() + ". Awaiting admin approval";
-        return new PostCreateResponse(request.getUserId(), post.getPost_id(), message);
+        return new PostCreateResponse(post.getId(), actorId, post.getPost_id(), message);
     }
 
     @Override
     @Transactional
-    public String updatePostV1(PostUpdateRequest updateRequest, Long postId) {
-        Post currentPost = postRepository.findById(postId)
-                .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
+    public PostUpdateResponse updatePostV1(
+            PostUpdateRequest updateRequest, Long rowId, Long actorId, boolean isAdmin) {
+        Post currentPost = getOwnedOrAdminPost(rowId, actorId, isAdmin);
 
         if (!"APPROVED".equals(currentPost.getStatus())) {
-            throw new RuntimeException("Only approved posts can be updated. Current status: " + currentPost.getStatus());
+            throw new IllegalStateException("Only approved posts can be updated. Current status: " + currentPost.getStatus());
         }
 
         Integer maxVersion = postRepository.findMaxVersionByPostId(currentPost.getPost_id());
@@ -137,24 +170,33 @@ public class PostServiceImplementation implements PostService {
 
         if (updateRequest.getPostTag() != null && !updateRequest.getPostTag().isEmpty()) {
             Subject subject = subjectRepository.findById(Long.parseLong(updateRequest.getPostTag()))
-                    .orElseThrow(() -> new RuntimeException("Subject not found with id: " + updateRequest.getPostTag()));
+                    .orElseThrow(() -> new NoSuchElementException("Subject not found with id: " + updateRequest.getPostTag()));
             
             boolean belongsToDepartment = subject.getListDepartments().stream()
                     .anyMatch(dept -> dept.getId().equals(currentPost.getDepartmentId()));
             
             if(!belongsToDepartment){
-                throw new RuntimeException("Subject does not belong to the department id " + currentPost.getDepartmentId());
+                throw new IllegalArgumentException("Subject does not belong to the department id " + currentPost.getDepartmentId());
             }
             Set<Subject> subjects = new HashSet<>();
             subjects.add(subject);
             newVersion.setSubjects(subjects);
         } else {
-            newVersion.setSubjects(currentPost.getSubjects());
+            newVersion.setSubjects(currentPost.getSubjects() == null
+                    ? new HashSet<>()
+                    : new HashSet<>(currentPost.getSubjects()));
         }
 
         postRepository.save(newVersion);
 
-        return "Post update submitted successfully. Version " + newVersion.getVersion() + " is pending admin approval.";
+        String message = "Post update submitted successfully. Version " + newVersion.getVersion()
+                + " is pending admin approval.";
+        return new PostUpdateResponse(
+                newVersion.getId(),
+                newVersion.getPost_id(),
+                newVersion.getVersion(),
+                newVersion.getStatus(),
+                message);
     }
 
     @Override
@@ -169,11 +211,11 @@ public class PostServiceImplementation implements PostService {
     @Transactional
     public String approvePostV1(PostApprovalRequest approvalRequest, Long postId) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
+                .orElseThrow(() -> new NoSuchElementException("Post not found with id: " + postId));
 
         // Validate that the post is pending approval
         if (!"PENDING_APPROVAL".equals(post.getStatus())) {
-            throw new RuntimeException("Post is not pending approval. Current status: " + post.getStatus());
+            throw new IllegalStateException("Post is not pending approval. Current status: " + post.getStatus());
         }
 
         if (approvalRequest.getApproved()) {
@@ -229,9 +271,8 @@ public class PostServiceImplementation implements PostService {
     }
 
     @Override
-    //softdelete to be implemented
-    public String deletePostV1(Long postId) {
-        return "";
+    public void validateDeleteAccessV1(Long rowId, Long actorId, boolean isAdmin) {
+        getOwnedOrAdminPost(rowId, actorId, isAdmin);
     }
 
     @Override
@@ -253,10 +294,14 @@ public class PostServiceImplementation implements PostService {
         response.setCreatedAt(post.getCreatedAt());
         response.setUpdatedAt(post.getUpdatedAt());
 
-        if (!post.getSubjects().isEmpty()) {
-            String tag = post.getSubjects().stream().findFirst().map(Subject::getName).orElse(null);
-            response.setPostTag(tag);
-        }
+        List<PostSubjectResponse> subjects = post.getSubjects() == null
+                ? List.of()
+                : post.getSubjects().stream()
+                        .sorted(Comparator.comparing(Subject::getId))
+                        .map(subject -> new PostSubjectResponse(subject.getId(), subject.getName()))
+                        .collect(Collectors.toList());
+        response.setSubjects(subjects);
+        response.setPostTag(subjects.stream().findFirst().map(PostSubjectResponse::getName).orElse(null));
 
         if (post.getUser() != null) {
             response.setUserId(post.getUser().getId());
@@ -301,6 +346,16 @@ public class PostServiceImplementation implements PostService {
         }
 
         return response;
+    }
+
+    private Post getOwnedOrAdminPost(Long rowId, Long actorId, boolean isAdmin) {
+        Post post = postRepository.findById(rowId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Post not found with id: " + rowId));
+        if (!isAdmin && !post.getUserId().equals(actorId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only post owner or admin may modify this post");
+        }
+        return post;
     }
 
 

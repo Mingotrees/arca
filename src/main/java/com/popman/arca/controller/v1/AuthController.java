@@ -2,6 +2,9 @@ package com.popman.arca.controller.v1;
 
 import com.popman.arca.dto.v1.auth.AuthResponse;
 import com.popman.arca.dto.v1.auth.LoginRequest;
+import com.popman.arca.dto.v1.auth.RegisterRequest;
+import com.popman.arca.dto.v1.auth.RegisterResponse;
+import com.popman.arca.dto.v1.common.MessageResponse;
 import com.popman.arca.dto.v1.refreshtoken.RefreshTokenRequest;
 import com.popman.arca.entity.RefreshToken;
 import com.popman.arca.entity.User;
@@ -9,6 +12,9 @@ import com.popman.arca.service.JWTService;
 import com.popman.arca.service.BannedEmailService;
 import com.popman.arca.service.RefreshTokenService;
 import com.popman.arca.service.UserService;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -44,16 +50,19 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody User user) {
+    @ApiResponse(responseCode = "201", description = "Registered",
+            content = @Content(schema = @Schema(implementation = RegisterResponse.class)))
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
-            if (bannedEmailService.isBannedV1(user.getEmail())) {
+            if (bannedEmailService.isBannedV1(request.getEmail())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(new ErrorResponse("Registration blocked: email is banned"));
             }
+            User user = request.toUser();
             String result = userService.createUserV1(user);
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
-                    new RegisterResponse(result, user.getEmail())
+                    new RegisterResponse(result, request.getEmail())
             );
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -65,6 +74,8 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @ApiResponse(responseCode = "200", description = "Authenticated",
+            content = @Content(schema = @Schema(implementation = AuthResponse.class)))
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         try {
             if (bannedEmailService.isBannedV1(loginRequest.getEmail())) {
@@ -108,6 +119,8 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
+    @ApiResponse(responseCode = "200", description = "Token refreshed",
+            content = @Content(schema = @Schema(implementation = AuthResponse.class)))
     public ResponseEntity<?> refreshToken(@RequestBody RefreshTokenRequest request) {
         try {
             RefreshToken refreshToken = refreshTokenService.findByToken(request.getRefreshToken())
@@ -140,6 +153,8 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
+    @ApiResponse(responseCode = "200", description = "Logged out",
+            content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     public ResponseEntity<?> logout(@RequestBody RefreshTokenRequest request) {
         try {
             refreshTokenService.findByToken(request.getRefreshToken())
@@ -156,19 +171,6 @@ public class AuthController {
         }
     }
 
-    private static class RegisterResponse {
-        private String message;
-        private String email;
-
-        public RegisterResponse(String message, String email) {
-            this.message = message;
-            this.email = email;
-        }
-
-        public String getMessage() { return message; }
-        public String getEmail() { return email; }
-    }
-
     private static class ErrorResponse {
         private String error;
 
@@ -179,13 +181,4 @@ public class AuthController {
         public String getError() { return error; }
     }
 
-    private static class MessageResponse {
-        private String message;
-
-        public MessageResponse(String message) {
-            this.message = message;
-        }
-
-        public String getMessage() { return message; }
-    }
 }
