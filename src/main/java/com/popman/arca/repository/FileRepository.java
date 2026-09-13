@@ -6,4 +6,5 @@ import com.popman.arca.entity.File;
 
 @Repository
 public interface FileRepository extends JpaRepository<File, Long> {
+    long countByPostId(Long postId);
 }

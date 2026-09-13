@@ -1,10 +1,12 @@
 openapi: 3.1.0
 info:
-  title: OpenAPI definition
-  version: v0
+  title: arca API
+  version: v1
 servers:
-- url: http://localhost:8080
-  description: Generated server url
+- url: https://arca-backend.dcism.org
+  description: Production
+- url: http://localhost:20255
+  description: Local development
 paths:
   /api/v1/vaults/edit-label:
     put:
@@ -19,11 +21,11 @@ paths:
         required: true
       responses:
         "200":
-          description: OK
+          description: Label updated
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/VaultResponse"
   /api/v1/user/{userId}:
     get:
       tags:
@@ -42,7 +44,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/UserResponse"
     put:
       tags:
       - user-controller
@@ -58,15 +60,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/UserUpdateRequest"
         required: true
       responses:
         "200":
-          description: OK
+          description: User updated
           content:
             '*/*':
               schema:
-                type: string
+                $ref: "#/components/schemas/MessageResponse"
     delete:
       tags:
       - user-controller
@@ -80,12 +82,33 @@ paths:
           format: int64
       responses:
         "200":
-          description: OK
+          description: User deleted
           content:
             '*/*':
               schema:
-                type: string
+                $ref: "#/components/schemas/MessageResponse"
   /api/v1/user/{userId}/profile-picture:
+    get:
+      tags:
+      - user-controller
+      operationId: getProfilePicture
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: Profile picture
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Profile picture not found
     put:
       tags:
       - user-controller
@@ -110,7 +133,7 @@ paths:
               - file
       responses:
         "200":
-          description: OK
+          description: Profile picture updated
           content:
             '*/*':
               schema:
@@ -196,14 +219,14 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
-  /api/v1/posts/{postId}:
+                $ref: "#/components/schemas/SchoolResponse"
+  /api/v1/posts/{rowId}:
     get:
       tags:
       - post-controller
       operationId: getPost
       parameters:
-      - name: postId
+      - name: rowId
         in: path
         required: true
         schema:
@@ -221,7 +244,7 @@ paths:
       - post-controller
       operationId: updatePost
       parameters:
-      - name: postId
+      - name: rowId
         in: path
         required: true
         schema:
@@ -239,25 +262,21 @@ paths:
           content:
             '*/*':
               schema:
-                type: string
+                $ref: "#/components/schemas/PostUpdateResponse"
     delete:
       tags:
       - post-controller
       operationId: deletePost
       parameters:
-      - name: postId
+      - name: rowId
         in: path
         required: true
         schema:
           type: integer
           format: int64
       responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                type: string
+        "501":
+          description: Post deletion is not implemented
   /api/v1/departments/{id}:
     get:
       tags:
@@ -335,11 +354,11 @@ paths:
         required: true
       responses:
         "200":
-          description: OK
+          description: Role removed
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/MessageResponse"
   /api/v1/admin/users/{id}/roles/add:
     put:
       tags:
@@ -360,11 +379,11 @@ paths:
         required: true
       responses:
         "200":
-          description: OK
+          description: Role added
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/MessageResponse"
   /api/v1/admin/users/{id}/promote:
     put:
       tags:
@@ -379,11 +398,11 @@ paths:
           format: int64
       responses:
         "200":
-          description: OK
+          description: User promoted
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/MessageResponse"
   /api/v1/admin/users/{id}/demote:
     put:
       tags:
@@ -398,11 +417,11 @@ paths:
           format: int64
       responses:
         "200":
-          description: OK
+          description: User demoted
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/MessageResponse"
   /api/v1/votes:
     post:
       tags:
@@ -416,11 +435,13 @@ paths:
         required: true
       responses:
         "200":
-          description: OK
+          description: Vote saved
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/VoteResponse"
+        "204":
+          description: Existing vote removed
   /api/v1/vaults/add:
     post:
       tags:
@@ -434,11 +455,11 @@ paths:
         required: true
       responses:
         "200":
-          description: OK
+          description: Post saved
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/MessageResponse"
   /api/v1/user:
     get:
       tags:
@@ -452,7 +473,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/User"
+                  $ref: "#/components/schemas/UserResponse"
     post:
       tags:
       - user-controller
@@ -461,7 +482,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/RegisterRequest"
         required: true
       responses:
         "200":
@@ -512,7 +533,9 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
+                type: array
+                items:
+                  $ref: "#/components/schemas/SchoolResponse"
     post:
       tags:
       - school-controller
@@ -529,8 +552,21 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/SchoolResponse"
   /api/v1/posts:
+    get:
+      tags:
+      - post-controller
+      operationId: getAllPosts
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostResponse"
     post:
       tags:
       - post-controller
@@ -542,8 +578,8 @@ paths:
               $ref: "#/components/schemas/PostRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Post created
           content:
             '*/*':
               schema:
@@ -568,11 +604,11 @@ paths:
         required: true
       responses:
         "200":
-          description: OK
+          description: Post moderation completed
           content:
             '*/*':
               schema:
-                type: string
+                $ref: "#/components/schemas/MessageResponse"
   /api/v1/files/upload:
     post:
       tags:
@@ -581,7 +617,7 @@ paths:
       parameters:
       - name: user_id
         in: query
-        required: true
+        required: false
         schema:
           type: integer
           format: int64
@@ -651,15 +687,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/RegisterRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Registered
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/RegisterResponse"
   /api/v1/auth/refresh:
     post:
       tags:
@@ -673,11 +709,11 @@ paths:
         required: true
       responses:
         "200":
-          description: OK
+          description: Token refreshed
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/AuthResponse"
   /api/v1/auth/logout:
     post:
       tags:
@@ -691,11 +727,11 @@ paths:
         required: true
       responses:
         "200":
-          description: OK
+          description: Logged out
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/MessageResponse"
   /api/v1/auth/login:
     post:
       tags:
@@ -709,11 +745,11 @@ paths:
         required: true
       responses:
         "200":
-          description: OK
+          description: Authenticated
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/AuthResponse"
   /api/v1/admin/create-admin:
     post:
       tags:
@@ -726,12 +762,12 @@ paths:
               $ref: "#/components/schemas/User"
         required: true
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Admin created
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/MessageResponse"
   /api/v1/admin/banned-emails:
     get:
       tags:
@@ -739,11 +775,13 @@ paths:
       operationId: listBannedEmails
       responses:
         "200":
-          description: OK
+          description: Banned emails
           content:
             '*/*':
               schema:
-                type: object
+                type: array
+                items:
+                  $ref: "#/components/schemas/BannedEmailResponse"
     post:
       tags:
       - admin-controller
@@ -755,12 +793,41 @@ paths:
               $ref: "#/components/schemas/BanEmailRequest"
         required: true
       responses:
+        "201":
+          description: Email banned
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+  /api/v1/user/me:
+    get:
+      tags:
+      - user-controller
+      operationId: getCurrentUser
+      responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/UserResponse"
+    patch:
+      tags:
+      - user-controller
+      operationId: updateCurrentUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UserResponse"
   /api/v1/votes/{postId}/upvotes:
     get:
       tags:
@@ -795,11 +862,13 @@ paths:
           format: int64
       responses:
         "200":
-          description: OK
+          description: Current vote
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/VoteResponse"
+        "204":
+          description: No current vote
   /api/v1/votes/{postId}/downvotes:
     get:
       tags:
@@ -834,11 +903,11 @@ paths:
           format: int64
       responses:
         "200":
-          description: OK
+          description: Vault entry
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/VaultResponse"
   /api/v1/vaults/user:
     get:
       tags:
@@ -846,30 +915,52 @@ paths:
       operationId: getUserVault
       responses:
         "200":
-          description: OK
+          description: Saved posts
           content:
             '*/*':
               schema:
-                type: object
-  /api/v1/vaults/check:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VaultResponse"
+  /api/v1/vaults/check/{postId}:
     get:
       tags:
       - vault-controller
       operationId: isPostSaved
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: integer
-              format: int64
+      parameters:
+      - name: postId
+        in: path
         required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: Saved state
+          content:
+            '*/*':
+              schema:
+                type: boolean
+  /api/v1/user/search:
+    get:
+      tags:
+      - user-controller
+      operationId: searchUsers
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                type: object
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSummaryResponse"
   /api/v1/posts/user/{userId}:
     get:
       tags:
@@ -877,6 +968,27 @@ paths:
       operationId: getAllUserPost
       parameters:
       - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostResponse"
+  /api/v1/posts/subject/{subjectId}:
+    get:
+      tags:
+      - post-controller
+      operationId: getPostsBySubject
+      parameters:
+      - name: subjectId
         in: path
         required: true
         schema:
@@ -917,6 +1029,26 @@ paths:
         schema:
           type: integer
           format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostResponse"
+  /api/v1/posts/mine:
+    get:
+      tags:
+      - post-controller
+      operationId: getMyPosts
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           description: OK
@@ -1014,11 +1146,13 @@ paths:
       operationId: getAllUsers
       responses:
         "200":
-          description: OK
+          description: Users
           content:
             '*/*':
               schema:
-                type: object
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserResponse"
   /api/v1/admin/users/{id}:
     get:
       tags:
@@ -1033,11 +1167,11 @@ paths:
           format: int64
       responses:
         "200":
-          description: OK
+          description: User
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/UserResponse"
     delete:
       tags:
       - admin-controller
@@ -1051,11 +1185,11 @@ paths:
           format: int64
       responses:
         "200":
-          description: OK
+          description: User deleted
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/MessageResponse"
   /api/v1/votes/{postId}:
     delete:
       tags:
@@ -1069,8 +1203,8 @@ paths:
           type: integer
           format: int64
       responses:
-        "200":
-          description: OK
+        "204":
+          description: Vote removed
   /api/v1/vaults/remove:
     delete:
       tags:
@@ -1085,11 +1219,11 @@ paths:
           format: int64
       responses:
         "200":
-          description: OK
+          description: Post removed
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/MessageResponse"
   /api/v1/schools/delete/{id}:
     delete:
       tags:
@@ -1108,7 +1242,7 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/MessageResponse"
   /api/v1/admin/banned-emails/{email}:
     delete:
       tags:
@@ -1122,11 +1256,11 @@ paths:
           type: string
       responses:
         "200":
-          description: OK
+          description: Email unbanned
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/MessageResponse"
 components:
   schemas:
     EditVaultLabelRequest:
@@ -1137,38 +1271,30 @@ components:
           format: int64
         newLabel:
           type: string
-    User:
+    VaultResponse:
       type: object
       properties:
         id:
           type: integer
           format: int64
-        firstName:
+        label:
           type: string
-        lastName:
-          type: string
-        password:
-          type: string
-        email:
+        post_id:
+          type: integer
+          format: int64
+    UserUpdateRequest:
+      type: object
+      properties:
+        bio:
           type: string
         course:
           type: string
         department:
           type: string
-        bio:
+        first_name:
           type: string
-        profilePicture:
+        last_name:
           type: string
-        deletedAt:
-          type: string
-          format: date-time
-        roles:
-          type: array
-          items:
-            type: string
-          uniqueItems: true
-        deleted:
-          type: boolean
     ProfilePictureResponse:
       type: object
       properties:
@@ -1226,6 +1352,18 @@ components:
       properties:
         name:
           type: string
+    SchoolResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        departments:
+          type: array
+          items:
+            $ref: "#/components/schemas/DepartmentResponse"
     PostUpdateRequest:
       type: object
       properties:
@@ -1237,6 +1375,22 @@ components:
           type: string
         postTag:
           type: string
+    PostUpdateResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        version:
+          type: integer
+          format: int32
+        status:
+          type: string
+        message:
+          type: string
+        post_id:
+          type: integer
+          format: int32
     DepartmentRequest:
       type: object
       properties:
@@ -1268,6 +1422,11 @@ components:
       properties:
         role:
           type: string
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
     VoteRequest:
       type: object
       properties:
@@ -1298,6 +1457,17 @@ components:
           format: int64
         label:
           type: string
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
     PostRequest:
       type: object
       properties:
@@ -1320,10 +1490,12 @@ components:
       - content
       - departmentId
       - title
-      - userId
     PostCreateResponse:
       type: object
       properties:
+        id:
+          type: integer
+          format: int64
         user_id:
           type: integer
           format: int64
@@ -1354,8 +1526,6 @@ components:
         fileSize:
           type: integer
           format: int64
-        filePath:
-          type: string
         userId:
           type: integer
           format: int64
@@ -1373,10 +1543,28 @@ components:
             $ref: "#/components/schemas/FileUploadRequest"
         message:
           type: string
+    RegisterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        email:
+          type: string
     RefreshTokenRequest:
       type: object
       properties:
         refreshToken:
+          type: string
+    AuthResponse:
+      type: object
+      properties:
+        email:
+          type: string
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
           type: string
     LoginRequest:
       type: object
@@ -1385,12 +1573,84 @@ components:
           type: string
         password:
           type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        firstName:
+          type: string
+        lastName:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+        email:
+          type: string
+        course:
+          type: string
+        department:
+          type: string
+        bio:
+          type: string
+        profilePicture:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+        deleted:
+          type: boolean
     BanEmailRequest:
       type: object
       properties:
         email:
           type: string
         reason:
+          type: string
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+        course:
+          type: string
+        department:
+          type: string
+        bio:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        profile_picture:
+          type: string
+    UserSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        first_name:
+          type: string
+        last_name:
+          type: string
+        course:
+          type: string
+        department:
+          type: string
+        bio:
+          type: string
+        profile_picture:
           type: string
     FileResponse:
       type: object
@@ -1439,6 +1699,10 @@ components:
           type: string
         postTag:
           type: string
+        subjects:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostSubjectResponse"
         rejectionReason:
           type: string
         createdAt:
@@ -1457,7 +1721,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FileResponse"
-        isLatestVersion:
+        is_latest_version:
           type: boolean
-        latestVersion:
-          type: boolean
+    PostSubjectResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+    BannedEmailResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+        reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time

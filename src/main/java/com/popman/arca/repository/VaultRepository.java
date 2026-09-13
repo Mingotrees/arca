@@ -12,5 +12,6 @@ public interface VaultRepository extends JpaRepository<Vault, Long> {
     List<Vault> findByUserId(Long userId);
     boolean existsByUserIdAndPostId(Long userId, Long postId);
     Optional<Vault> findByUserIdAndPostId(Long userId, Long postId);
+    Optional<Vault> findByIdAndUserId(Long id, Long userId);
 
 }

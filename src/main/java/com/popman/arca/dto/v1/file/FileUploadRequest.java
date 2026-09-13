@@ -5,7 +5,6 @@ public class FileUploadRequest {
     private String fileName;
     private String fileType;
     private Long fileSize;
-    private String filePath;
     private Long userId;
     private Long postId;
     private String message;
@@ -13,12 +12,11 @@ public class FileUploadRequest {
     public FileUploadRequest() {}
 
     public FileUploadRequest(Long id, String fileName, String fileType, Long fileSize,
-                             String filePath, Long userId, Long postId, String message) {
+                             Long userId, Long postId, String message) {
         this.id = id;
         this.fileName = fileName;
         this.fileType = fileType;
         this.fileSize = fileSize;
-        this.filePath = filePath;
         this.userId = userId;
         this.postId = postId;
         this.message = message;
@@ -35,9 +33,6 @@ public class FileUploadRequest {
 
     public Long getFileSize() { return fileSize; }
     public void setFileSize(Long fileSize) { this.fileSize = fileSize; }
-
-    public String getFilePath() { return filePath; }
-    public void setFilePath(String filePath) { this.filePath = filePath; }
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }

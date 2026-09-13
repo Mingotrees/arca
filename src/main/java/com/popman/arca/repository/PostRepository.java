@@ -1,16 +1,23 @@
 package com.popman.arca.repository;
 
 import com.popman.arca.entity.Post;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface PostRepository extends JpaRepository<Post, Long> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Post p WHERE p.id = :rowId")
+    Optional<Post> findByIdForUpdate(@Param("rowId") Long rowId);
+
     @Query("SELECT COALESCE(MAX(p.post_id), 0) + 1 FROM Post p")
     Integer getNextPostId();
 
@@ -19,6 +26,15 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     @Query("SELECT p FROM Post p WHERE p.post_id = :postId ORDER BY p.version DESC")
     List<Post> findAllVersionsByPostId(@Param("postId") Integer postId);
+
+    @Query("SELECT p FROM Post p WHERE p.status = 'APPROVED' AND p.isLatestVersion = true " +
+            "ORDER BY p.updatedAt DESC")
+    List<Post> findLatestApprovedPosts();
+
+    @Query("SELECT DISTINCT p FROM Post p JOIN p.subjects s WHERE s.id = :subjectId " +
+            "AND p.status = 'APPROVED' AND p.isLatestVersion = true " +
+            "ORDER BY p.updatedAt DESC")
+    List<Post> findLatestApprovedPostsBySubjectId(@Param("subjectId") Long subjectId);
 
     @Query("SELECT p FROM Post p WHERE p.department.id = :departmentId " +
             "AND p.status = 'APPROVED' AND p.isLatestVersion = true " +
@@ -48,5 +64,16 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             "AND p.status = 'APPROVED' AND p.isLatestVersion = true " +
             "ORDER BY p.updatedAt DESC")
     List<Post> findLatestApprovedPostsByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT p FROM Post p WHERE p.userId = :userId " +
+            "AND p.version = (SELECT MAX(p2.version) FROM Post p2 WHERE p2.post_id = p.post_id) " +
+            "ORDER BY p.updatedAt DESC")
+    List<Post> findAllPostsByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT p FROM Post p WHERE p.userId = :userId AND p.status = :status " +
+            "AND p.version = (SELECT MAX(p2.version) FROM Post p2 WHERE p2.post_id = p.post_id) " +
+            "ORDER BY p.updatedAt DESC")
+    List<Post> findAllPostsByUserIdAndStatus(@Param("userId") Long userId,
+                                             @Param("status") String status);
 
 }

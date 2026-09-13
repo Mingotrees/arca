@@ -13,6 +13,8 @@ import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.NoSuchElementException;
+
 @Service
 public class VoteServiceImplementation implements VoteService {
 
@@ -29,11 +31,14 @@ public class VoteServiceImplementation implements VoteService {
     public VoteResponse createOrUpdateVoteV1(VoteRequest request, Long userId) {
 
         Post post = postRepository.findById(request.getPostId())
-                .orElseThrow(() -> new RuntimeException("Post not found"));
+                .orElseThrow(() -> new NoSuchElementException("Post not found"));
 
+        if (!"APPROVED".equals(post.getStatus())) {
+            throw new IllegalArgumentException("Votes are allowed only on approved posts");
+        }
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NoSuchElementException("User not found"));
 
 
         Vote vote = voteRepository.findByPostIdAndUserId(request.getPostId(), userId)

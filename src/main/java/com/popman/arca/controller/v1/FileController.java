@@ -3,16 +3,17 @@ package com.popman.arca.controller.v1;
 import com.popman.arca.dto.v1.file.FileUploadRequest;
 import com.popman.arca.dto.v1.file.MultipleFileUploadRequest;
 import com.popman.arca.entity.File;
+import com.popman.arca.entity.UserPrincipal;
 import com.popman.arca.service.FileService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,35 +30,20 @@ public class FileController {
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<MultipleFileUploadRequest> uploadFile(
             @RequestParam("file") List<MultipartFile> files,
-            @RequestParam("user_id") Long userId,
-            @RequestParam("post_id") Long postId) throws IOException {
+            @RequestParam(value = "user_id", required = false) Long ignoredUserId,
+            @RequestParam("post_id") Long postId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) throws IOException {
 
-        if (files == null || files.isEmpty()) {
-            throw new IllegalArgumentException("File must not be null or empty");
+        if (userPrincipal == null) {
+            throw new IllegalArgumentException("Authenticated user is required");
         }
 
-        if (files.size() > 3){
-            throw new IllegalArgumentException("Only maximum of 3 files allowed");
-        }
-
-        if (userId == null || postId == null) {
-            throw new IllegalArgumentException("userId and postId must not be null");
-        }
-
-        List<File> savedFiles = new ArrayList<>();
-
-        for(MultipartFile file: files){
-            String contentType = file.getContentType();
-            if(contentType.equals("image/jpeg") ||
-                    contentType.equals("image/png") ||
-                    contentType.equals("application/pdf")){
-                File savedFile = fileService.uploadFileV1(file, userId, postId);
-                savedFiles.add(savedFile);
-            }else{
-                throw new IllegalArgumentException("Only image/jpeg or image/png or application/pdf");
-            }
-
-        }
+        List<File> savedFiles = fileService.uploadFilesV1(
+                files,
+                userPrincipal.getId(),
+                postId,
+                userPrincipal.hasRole("ROLE_ADMIN")
+        );
 
         List<FileUploadRequest> fileResponses = savedFiles.stream()
                 .map(savedFile -> new FileUploadRequest(
@@ -65,7 +51,6 @@ public class FileController {
                         savedFile.getFileName(),
                         savedFile.getFileType(),
                         savedFile.getFileSize(),
-                        savedFile.getFilePath(),
                         savedFile.getUser().getId(),
                         savedFile.getPost().getId(),
                         "File uploaded successfully"
@@ -100,7 +85,6 @@ public class FileController {
                             file.getFileName(),
                             file.getFileType(),
                             file.getFileSize(),
-                            file.getFilePath(),
                             file.getUser().getId(),
                             file.getPost().getId(),
                             "File info retrieved successfully"
