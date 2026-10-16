@@ -167,7 +167,7 @@ jobs:
           if [ -f arca.jar.previous ]; then
             echo "Restoring previous backend"
             cp arca.jar.previous arca.jar
-            nohup java -jar arca.jar > arca.log 2>&1 < /dev/null &
+            nohup "$HOME/.local/java21/bin/java" -jar arca.jar > arca.log 2>&1 < /dev/null &
             printf '%s\n' "$!" > arca.pid
           fi
 
