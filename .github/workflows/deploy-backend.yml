@@ -130,7 +130,7 @@ jobs:
           mv arca.log arca.log.previous 2>/dev/null || true
 
           echo "Starting new backend"
-          nohup java -jar arca.jar > arca.log 2>&1 < /dev/null &
+          nohup "$HOME/.local/java21/bin/java" -jar arca.jar > arca.log 2>&1 < /dev/null &
           NEW_PID=$!
           printf '%s\n' "$NEW_PID" > arca.pid
 
