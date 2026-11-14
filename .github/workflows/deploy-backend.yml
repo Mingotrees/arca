@@ -29,7 +29,14 @@ jobs:
           cache: maven
 
       - name: Build backend
-        run: ./mvnw --batch-mode clean package -DskipTests
+        run: ./mvnw --batch-mode clean verify
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate OpenAPI
+        run: npx --yes @redocly/cli@2.78.0 lint --extends=minimal --format=summary openapi.yaml
 
       - name: Configure SSH
         env:
@@ -86,7 +93,7 @@ jobs:
             exit 1
           fi
 
-          # Save the current version for rollback.
+          # Retain the previous artifact for diagnosis; schema releases are forward-only.
           if [ -f arca.jar ]; then
             cp arca.jar arca.jar.previous
           elif [ -f arca-0.0.1-SNAPSHOT.jar ]; then
@@ -164,12 +171,9 @@ jobs:
           kill "$NEW_PID" 2>/dev/null || true
           rm -f arca.pid
 
-          if [ -f arca.jar.previous ]; then
-            echo "Restoring previous backend"
-            cp arca.jar.previous arca.jar
-            nohup "$HOME/.local/java21/bin/java" -jar arca.jar > arca.log 2>&1 < /dev/null &
-            printf '%s\n' "$!" > arca.pid
-          fi
+          # A pre-Phase-1 JAR ignores deletion flags and can reveal retained content.
+          # Keep service stopped rather than automatically restore an incompatible binary.
+          echo "Forward-only schema release: deploy a compatible fix; previous JAR retained for diagnosis"
 
           if [ -f arca.failed.log ]; then
             tail -n 100 arca.failed.log

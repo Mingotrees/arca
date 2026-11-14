@@ -12,6 +12,14 @@ import com.popman.arca.service.PostService;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +30,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/posts")
+@SecurityScheme(name = "bearerAuth", type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT")
 public class PostController {
 
     private final PostService postService;
@@ -48,8 +57,10 @@ public class PostController {
     }
 
     @GetMapping("/{rowId}")
+    @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = PostResponse.class)))
+    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
     public ResponseEntity<PostResponse> getPost(
-            @PathVariable Long rowId,
+            @Parameter(description = "Post version database row id, not logical post_id") @PathVariable Long rowId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         PostResponse response = postService.getPostV1(rowId, userPrincipal.getId(), isAdmin(userPrincipal));
         return ResponseEntity.ok(response);
@@ -78,9 +89,11 @@ public class PostController {
     }
 
     @PutMapping("/{rowId}")
+    @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = PostUpdateResponse.class)))
+    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
     public ResponseEntity<PostUpdateResponse> updatePost(
             @Valid @RequestBody PostUpdateRequest updatedPost,
-            @PathVariable Long rowId,
+            @Parameter(description = "Post version database row id, not logical post_id") @PathVariable Long rowId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         PostUpdateResponse response = postService.updatePostV1(
                 updatedPost, rowId, userPrincipal.getId(), isAdmin(userPrincipal));
@@ -88,12 +101,30 @@ public class PostController {
     }
 
     @DeleteMapping("/{rowId}")
-    @ApiResponse(responseCode = "501", description = "Post deletion is not implemented", content = @Content)
+    @Operation(summary = "Soft-delete a logical post", description = "Owner/admin soft-deletes every version sharing the logical post_id. " +
+            "Rows and files are retained; repeated authorized deletion returns 204.",
+            security = @SecurityRequirement(name = "bearerAuth"),
+            parameters = @Parameter(name = "X-Request-ID", in = ParameterIn.HEADER,
+                    description = "Optional correlation ID: 1-64 letters, digits, dots, underscores or hyphens; invalid values are replaced by a UUID",
+                    schema = @Schema(type = "string")))
+    @ApiResponse(responseCode = "204", description = "Logical post deleted; no response body", content = @Content,
+            headers = @Header(name = "X-Request-ID", description = "Safe request correlation ID", schema = @Schema(type = "string")))
+    @ApiResponse(responseCode = "401", description = "Authentication required",
+            content = @Content(mediaType = "application/json", schema = @Schema(type = "object"),
+                    examples = @ExampleObject(value = "{\"error\":\"unauthorized\",\"message\":\"Authentication required\"}")))
+    @ApiResponse(responseCode = "403", description = "Only owner/admin may delete an active post",
+            content = @Content(mediaType = "application/json", schema = @Schema(type = "object"),
+                    examples = @ExampleObject(value = "{\"timestamp\":\"2026-11-14T09:00:00\",\"status\":403," +
+                            "\"error\":\"ResponseStatusException\",\"message\":\"Only post owner or admin may modify this post\"}")))
+    @ApiResponse(responseCode = "404", description = "Row missing or deleted post inaccessible to caller",
+            content = @Content(mediaType = "application/json", schema = @Schema(type = "object"),
+                    examples = @ExampleObject(value = "{\"timestamp\":\"2026-11-14T09:00:00\",\"status\":404," +
+                            "\"error\":\"ResponseStatusException\",\"message\":\"Post not found\"}")))
     public ResponseEntity<Void> deletePost(
-            @PathVariable Long rowId,
+            @Parameter(description = "Database row id of any version, not logical post_id") @PathVariable Long rowId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        postService.validateDeleteAccessV1(rowId, userPrincipal.getId(), isAdmin(userPrincipal));
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+        postService.deletePostV1(rowId, userPrincipal.getId(), isAdmin(userPrincipal));
+        return ResponseEntity.noContent().build();
     }
 
 
@@ -106,9 +137,10 @@ public class PostController {
     @PostMapping("/{postId}/approve")
     @ApiResponse(responseCode = "200", description = "Post moderation completed",
             content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
     public ResponseEntity<MessageResponse> approvePost(
             @Valid @RequestBody PostApprovalRequest approvalRequest,
-            @PathVariable("postId") Long postId) {
+            @Parameter(description = "Post version database row id, not logical post_id") @PathVariable("postId") Long postId) {
         String message = postService.approvePostV1(approvalRequest, postId);
         return ResponseEntity.ok(new MessageResponse(message));
     }
@@ -120,7 +152,9 @@ public class PostController {
     }
 
     @GetMapping("/history/{postId}")
-    public ResponseEntity<List<PostResponse>> getPostHistory(@PathVariable("postId") Integer postId) {
+    @Operation(description = "Returns active versions for a logical post_id; deleted posts have an empty history list.")
+    public ResponseEntity<List<PostResponse>> getPostHistory(
+            @Parameter(description = "Logical post_id, not a version database row id") @PathVariable("postId") Integer postId) {
         List<PostResponse> versions = postService.getPostHistoryV1(postId);
         return ResponseEntity.ok(versions);
     }

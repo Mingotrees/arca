@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -23,10 +25,12 @@ public class VoteController {
     }
 
     @PostMapping
+    @Operation(description = "Request post_id is a post version database row id, not logical post_id. Deleted posts are inaccessible.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Vote saved",
                     content = @Content(schema = @Schema(implementation = VoteResponse.class))),
-            @ApiResponse(responseCode = "204", description = "Existing vote removed", content = @Content)
+            @ApiResponse(responseCode = "204", description = "Existing vote removed", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
     })
     public ResponseEntity<VoteResponse> vote(
             @RequestBody VoteRequest request,
@@ -44,8 +48,9 @@ public class VoteController {
 
     @DeleteMapping("/{postId}")
     @ApiResponse(responseCode = "204", description = "Vote removed", content = @Content)
+    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
     public ResponseEntity<Void> removeVote(
-            @PathVariable Long postId,
+            @Parameter(description = "Post version database row id, not logical post_id") @PathVariable Long postId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
         Long userId = userPrincipal.getId();
@@ -57,10 +62,11 @@ public class VoteController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Current vote",
                     content = @Content(schema = @Schema(implementation = VoteResponse.class))),
-            @ApiResponse(responseCode = "204", description = "No current vote", content = @Content)
+            @ApiResponse(responseCode = "204", description = "No current vote", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
     })
     public ResponseEntity<VoteResponse> getMyVote(
-            @PathVariable Long postId,
+            @Parameter(description = "Post version database row id, not logical post_id") @PathVariable Long postId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
         Long userId = userPrincipal.getId();
@@ -72,12 +78,18 @@ public class VoteController {
     }
 
     @GetMapping("/{postId}/upvotes")
-    public ResponseEntity<Integer> getUpvoteCount(@PathVariable Long postId) {
+    @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(type = "integer", format = "int32")))
+    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
+    public ResponseEntity<Integer> getUpvoteCount(
+            @Parameter(description = "Post version database row id, not logical post_id") @PathVariable Long postId) {
         return ResponseEntity.ok(voteService.getUpvoteCountV1(postId));
     }
 
     @GetMapping("/{postId}/downvotes")
-    public ResponseEntity<Integer> getDownvoteCount(@PathVariable Long postId) {
+    @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(type = "integer", format = "int32")))
+    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
+    public ResponseEntity<Integer> getDownvoteCount(
+            @Parameter(description = "Post version database row id, not logical post_id") @PathVariable Long postId) {
         return ResponseEntity.ok(voteService.getDownvoteCountV1(postId));
     }
 }

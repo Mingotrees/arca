@@ -12,6 +12,8 @@ import com.popman.arca.service.VoteService;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.NoSuchElementException;
 
@@ -30,8 +32,10 @@ public class VoteServiceImplementation implements VoteService {
     @Transactional
     public VoteResponse createOrUpdateVoteV1(VoteRequest request, Long userId) {
 
-        Post post = postRepository.findById(request.getPostId())
+        postRepository.lockLogicalPostByRowId(request.getPostId());
+        Post post = postRepository.findByIdForUpdate(request.getPostId())
                 .orElseThrow(() -> new NoSuchElementException("Post not found"));
+        requireActive(post);
 
         if (!"APPROVED".equals(post.getStatus())) {
             throw new IllegalArgumentException("Votes are allowed only on approved posts");
@@ -62,21 +66,39 @@ public class VoteServiceImplementation implements VoteService {
 
     @Transactional
     public void removeVoteV1(Long postId, Long userId) {
+        postRepository.lockLogicalPostByRowId(postId);
+        Post post = postRepository.findByIdForUpdate(postId)
+                .orElseThrow(() -> new NoSuchElementException("Post not found"));
+        requireActive(post);
         voteRepository.deleteByPostIdAndUserId(postId, userId);
     }
 
     public VoteResponse getUserVoteForPostV1(Long postId, Long userId) {
+        requireActivePost(postId);
         return voteRepository.findByPostIdAndUserId(postId, userId)
                 .map(this::convertToDTO)
                 .orElse(null);
     }
 
     public Integer getUpvoteCountV1(Long postId) {
+        requireActivePost(postId);
         return voteRepository.countByPostIdAndVoteType(postId, "UPVOTE");
     }
 
     public Integer getDownvoteCountV1(Long postId) {
+        requireActivePost(postId);
         return voteRepository.countByPostIdAndVoteType(postId, "DOWNVOTE");
+    }
+
+    private void requireActivePost(Long postId) {
+        requireActive(postRepository.findById(postId)
+                .orElseThrow(() -> new NoSuchElementException("Post not found")));
+    }
+
+    private void requireActive(Post post) {
+        if (post.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found");
+        }
     }
 
     private VoteResponse convertToDTO(Vote vote) {

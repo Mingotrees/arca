@@ -10,6 +10,8 @@ import com.popman.arca.entity.Subject;
 import com.popman.arca.entity.User;
 import com.popman.arca.repository.DepartmentRepository;
 import com.popman.arca.repository.PostRepository;
+import com.popman.arca.repository.PostIdentityRepository;
+import com.popman.arca.entity.PostIdentity;
 import com.popman.arca.repository.SubjectRepository;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.impl.PostServiceImplementation;
@@ -41,6 +43,8 @@ class PostServiceImplementationTest {
     @Mock
     private PostRepository postRepository;
     @Mock
+    private PostIdentityRepository postIdentityRepository;
+    @Mock
     private UserRepository userRepository;
     @Mock
     private DepartmentRepository departmentRepository;
@@ -66,7 +70,11 @@ class PostServiceImplementationTest {
 
         when(userRepository.findById(7L)).thenReturn(Optional.of(actor));
         when(departmentRepository.findById(3L)).thenReturn(Optional.of(department));
-        when(postRepository.getNextPostId()).thenReturn(12);
+        when(postIdentityRepository.saveAndFlush(any(PostIdentity.class))).thenAnswer(invocation -> {
+            PostIdentity identity = invocation.getArgument(0);
+            identity.setId(12);
+            return identity;
+        });
         when(postRepository.save(any(Post.class))).thenAnswer(invocation -> {
             Post saved = invocation.getArgument(0);
             saved.setId(42L);
@@ -92,7 +100,7 @@ class PostServiceImplementationTest {
         Post current = approvedPost(4L, 7L);
         current.setSubjects(originalSubjects);
 
-        when(postRepository.findById(4L)).thenReturn(Optional.of(current));
+        when(postRepository.findByIdForUpdate(4L)).thenReturn(Optional.of(current));
         when(postRepository.findMaxVersionByPostId(20)).thenReturn(1);
         when(postRepository.save(any(Post.class))).thenAnswer(invocation -> {
             Post saved = invocation.getArgument(0);
@@ -115,7 +123,7 @@ class PostServiceImplementationTest {
 
     @Test
     void updateRejectsNonOwnerBeforeCreatingVersion() {
-        when(postRepository.findById(4L)).thenReturn(Optional.of(approvedPost(4L, 7L)));
+        when(postRepository.findByIdForUpdate(4L)).thenReturn(Optional.of(approvedPost(4L, 7L)));
 
         ResponseStatusException exception = assertThrows(
                 ResponseStatusException.class,
@@ -127,7 +135,7 @@ class PostServiceImplementationTest {
 
     @Test
     void ownerPassesDeleteAccessValidation() {
-        when(postRepository.findById(4L)).thenReturn(Optional.of(approvedPost(4L, 7L)));
+        when(postRepository.findByIdForUpdate(4L)).thenReturn(Optional.of(approvedPost(4L, 7L)));
 
         assertDoesNotThrow(() -> postService.validateDeleteAccessV1(4L, 7L, false));
     }

@@ -1,0 +1,21 @@
+name: Backend tests
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Unit, security, MySQL repository and migration tests
+        run: ./mvnw --batch-mode verify
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate OpenAPI
+        run: npx --yes @redocly/cli@2.78.0 lint --extends=minimal --format=summary openapi.yaml

@@ -8,11 +8,15 @@ import com.popman.arca.repository.VaultRepository;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.VaultService;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import jakarta.transaction.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@Transactional
 public class VaultServiceImplementation implements VaultService {
 
     private final VaultRepository vaultRepository;
@@ -27,13 +31,12 @@ public class VaultServiceImplementation implements VaultService {
 
     @Override
     public Vault addToVaultV1(Long userId, Long postId, String label){
-
+        Post post = lockActivePost(postId);
         try {
             if(vaultRepository.existsByUserIdAndPostId(userId, postId)){
                 throw new IllegalStateException("Post already saved to Vault");
             }
             User user = userRepository.findById(userId).orElseThrow(()-> new RuntimeException("User not found with ID: " + userId));
-            Post post = postRepository.findById(postId).orElseThrow(()-> new RuntimeException("Post not Found with ID: " + postId));
             Vault vault = new Vault();
             vault.setUser(user);
             vault.setPost(post);
@@ -47,7 +50,7 @@ public class VaultServiceImplementation implements VaultService {
 
     @Override
     public void removeFromVaultV1(Long userId, Long postId){
-
+        lockActivePost(postId);
         try{
             Optional<Vault> vaultEntry = vaultRepository.findByUserIdAndPostId(userId, postId);
             if(vaultEntry.isEmpty()){
@@ -61,7 +64,7 @@ public class VaultServiceImplementation implements VaultService {
 
     @Override
     public Vault editLabelV1(Long userId, Long postId, String newLabel) {
-
+        lockActivePost(postId);
         try {
             Vault vault = vaultRepository.findByUserIdAndPostId(userId, postId).orElseThrow(()-> new RuntimeException("Vault entry not found for this user and post"));
             vault.setLabel(newLabel);
@@ -91,10 +94,27 @@ public class VaultServiceImplementation implements VaultService {
 
     @Override
     public boolean isPostSavedV1(Long userId, Long postId){
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
+        requireActive(post);
         try {
             return vaultRepository.existsByUserIdAndPostId(userId, postId);
         }catch(Exception e){
             throw new RuntimeException("Failed to check if post is saved: " + e.getMessage());
+        }
+    }
+
+    private Post lockActivePost(Long postId) {
+        postRepository.lockLogicalPostByRowId(postId);
+        Post post = postRepository.findByIdForUpdate(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
+        requireActive(post);
+        return post;
+    }
+
+    private void requireActive(Post post) {
+        if (post.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found");
         }
     }
 }

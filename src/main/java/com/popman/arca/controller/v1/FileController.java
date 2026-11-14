@@ -5,6 +5,10 @@ import com.popman.arca.dto.v1.file.MultipleFileUploadRequest;
 import com.popman.arca.entity.File;
 import com.popman.arca.entity.UserPrincipal;
 import com.popman.arca.service.FileService;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -28,10 +32,12 @@ public class FileController {
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = MultipleFileUploadRequest.class)))
+    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
     public ResponseEntity<MultipleFileUploadRequest> uploadFile(
             @RequestParam("file") List<MultipartFile> files,
             @RequestParam(value = "user_id", required = false) Long ignoredUserId,
-            @RequestParam("post_id") Long postId,
+            @Parameter(description = "Post version database row id, not logical post_id") @RequestParam("post_id") Long postId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) throws IOException {
 
         if (userPrincipal == null) {
@@ -65,6 +71,8 @@ public class FileController {
     }
 
     @GetMapping("/download/{id}")
+    @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(type = "string", format = "binary")))
+    @ApiResponse(responseCode = "404", description = "File not found, including files of deleted posts", content = @Content)
     public ResponseEntity<Resource> downloadFile(@PathVariable Long id) throws IOException {
         Resource fileResource = fileService.downloadFileV1(id);
         File fileEntity = fileService.getFileV1(id).orElseThrow(() -> new IOException("File metadata not found"));
@@ -77,6 +85,8 @@ public class FileController {
     }
 
     @GetMapping("/{id}")
+    @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = FileUploadRequest.class)))
+    @ApiResponse(responseCode = "404", description = "File not found, including files of deleted posts", content = @Content)
     public ResponseEntity<FileUploadRequest> getFileInfo(@PathVariable Long id) {
         return fileService.getFileV1(id)
                 .map(file -> {

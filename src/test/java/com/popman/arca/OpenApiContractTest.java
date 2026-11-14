@@ -1,0 +1,69 @@
+package com.popman.arca;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.web.servlet.MockMvc;
+import org.yaml.snakeyaml.Yaml;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+class OpenApiContractTest {
+    @Autowired MockMvc mvc;
+    @Autowired ObjectMapper mapper;
+
+    @Test
+    void checkedInDeletionContractMatchesGeneratedContractAndLegacyOperationsRemain() throws Exception {
+        JsonNode generated = mapper.readTree(mvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        JsonNode checked;
+        try (var stream = Files.newInputStream(Path.of("openapi.yaml"))) {
+            checked = mapper.valueToTree(new Yaml().load(stream));
+        }
+        JsonNode deletion = generated.at("/paths/~1api~1v1~1posts~1{rowId}/delete");
+        assertEquals(Set.of("204", "401", "403", "404"), names(deletion.path("responses")));
+        assertFalse(deletion.path("responses").path("204").has("content"));
+        assertEquals(checked.at("/paths/~1api~1v1~1posts~1{rowId}/delete"), deletion);
+        assertFalse(generated.at("/components/schemas/PostResponse/properties").has("is_deleted"));
+        assertEquals(names(checked.at("/components/schemas/PostResponse/properties")),
+                names(generated.at("/components/schemas/PostResponse/properties")));
+
+        var paths = checked.path("paths").fields();
+        while (paths.hasNext()) {
+            var path = paths.next();
+            var operations = path.getValue().fields();
+            while (operations.hasNext()) {
+                var operation = operations.next();
+                if (!Set.of("get", "post", "put", "patch", "delete", "options", "head").contains(operation.getKey())) continue;
+                assertEquals(operation.getValue().path("operationId"),
+                        generated.path("paths").path(path.getKey()).path(operation.getKey()).path("operationId"),
+                        path.getKey() + " " + operation.getKey());
+                if (path.getKey().startsWith("/api/v1/files") || path.getKey().startsWith("/api/v1/votes")
+                        || path.getKey().startsWith("/api/v1/vaults") || path.getKey().equals("/api/v1/posts/{rowId}")
+                        || path.getKey().equals("/api/v1/posts/{postId}/approve")
+                        || path.getKey().equals("/api/v1/posts/history/{postId}")) {
+                    assertEquals(operation.getValue(), generated.path("paths").path(path.getKey()).path(operation.getKey()),
+                            "Related-resource contract drift: " + path.getKey() + " " + operation.getKey());
+                }
+            }
+        }
+    }
+
+    private Set<String> names(JsonNode node) {
+        Set<String> result = new HashSet<>();
+        node.fieldNames().forEachRemaining(result::add);
+        return result;
+    }
+}

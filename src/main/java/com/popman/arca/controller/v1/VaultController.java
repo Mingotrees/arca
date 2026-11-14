@@ -12,9 +12,12 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -29,13 +32,17 @@ public class VaultController {
     }
 
     @PostMapping("/add")
+    @Operation(description = "Request post_id is a post version database row id, not logical post_id. Deleted posts are inaccessible.")
     @ApiResponse(responseCode = "200", description = "Post saved",
             content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
     public ResponseEntity<?> addToVault(@AuthenticationPrincipal UserPrincipal userDetails,@RequestBody VaultRequest request){
         try {
             Long userId = userDetails.getId();
             Vault savedVault = vaultService.addToVaultV1(userId, request.getPostId(),request.getLabel());
             return ResponseEntity.ok(new MessageResponse("Post successfully added to Vault."));
+        }catch (ResponseStatusException e){
+            throw e;
         }catch (RuntimeException e){
             return ResponseEntity.badRequest().body(e.getMessage());
         }catch (Exception e){
@@ -47,11 +54,15 @@ public class VaultController {
     @DeleteMapping("/remove")
     @ApiResponse(responseCode = "200", description = "Post removed",
             content = @Content(schema = @Schema(implementation = MessageResponse.class)))
-    public ResponseEntity<?> removeFromVault(@AuthenticationPrincipal UserPrincipal userDetails ,@RequestParam Long postId){
+    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
+    public ResponseEntity<?> removeFromVault(@AuthenticationPrincipal UserPrincipal userDetails,
+            @Parameter(description = "Post version database row id, not logical post_id") @RequestParam Long postId){
         try {
             Long userId = userDetails.getId();
             vaultService.removeFromVaultV1(userId, postId);
             return ResponseEntity.ok(new MessageResponse("Post removed from Vault."));
+        }catch (ResponseStatusException e){
+            throw e;
         }catch (RuntimeException e){
             return ResponseEntity.badRequest().body(e.getMessage());
         }catch (Exception e){
@@ -61,8 +72,10 @@ public class VaultController {
 
 
     @PutMapping("/edit-label")
+    @Operation(description = "Request post_id is a post version database row id, not logical post_id. Deleted posts are inaccessible.")
     @ApiResponse(responseCode = "200", description = "Label updated",
             content = @Content(schema = @Schema(implementation = VaultResponse.class)))
+    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
     public ResponseEntity<?> editLabel(@AuthenticationPrincipal UserPrincipal userDetails, @RequestBody EditVaultLabelRequest request){
 
         try {
@@ -70,6 +83,8 @@ public class VaultController {
             Vault updatedVault = vaultService.editLabelV1(userId, request.getPostId(), request.getNewLabel());
 
             return ResponseEntity.ok(new VaultResponse(updatedVault));
+        }catch (ResponseStatusException e){
+            throw e;
         }catch (RuntimeException e){
             return ResponseEntity.badRequest().body(e.getMessage());
         }catch (Exception e){
@@ -78,6 +93,7 @@ public class VaultController {
     }
 
     @GetMapping("/user")
+    @Operation(description = "Returns saved entries excluding deleted posts; retained entries are hidden, not physically purged.")
     @ApiResponse(responseCode = "200", description = "Saved posts",
             content = @Content(array = @ArraySchema(schema = @Schema(implementation = VaultResponse.class))))
     public ResponseEntity<?> getUserVault(@AuthenticationPrincipal UserPrincipal userDetails){
@@ -94,12 +110,16 @@ public class VaultController {
     @GetMapping("/check/{postId}")
     @ApiResponse(responseCode = "200", description = "Saved state",
             content = @Content(schema = @Schema(implementation = Boolean.class)))
-    public ResponseEntity<?> isPostSaved(@AuthenticationPrincipal UserPrincipal userDetails, @PathVariable Long postId){
+    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
+    public ResponseEntity<?> isPostSaved(@AuthenticationPrincipal UserPrincipal userDetails,
+            @Parameter(description = "Post version database row id, not logical post_id") @PathVariable Long postId){
 
         try {
             Long userId = userDetails.getId();
             boolean exists = vaultService.isPostSavedV1(userId, postId);
             return ResponseEntity.ok(exists);
+        }catch (ResponseStatusException e){
+            throw e;
         }catch (Exception e){
             return ResponseEntity.internalServerError().body("Error checking post in vault");
         }
@@ -108,6 +128,7 @@ public class VaultController {
     @GetMapping("/{id}")
     @ApiResponse(responseCode = "200", description = "Vault entry",
             content = @Content(schema = @Schema(implementation = VaultResponse.class)))
+    @ApiResponse(responseCode = "404", description = "Vault entry not found, including entries of deleted posts", content = @Content)
     public ResponseEntity<VaultResponse> getVaultEntry(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal userDetails){
