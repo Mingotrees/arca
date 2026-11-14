@@ -7,6 +7,7 @@ import com.popman.arca.repository.PostRepository;
 import com.popman.arca.repository.VaultRepository;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.VaultService;
+import com.popman.arca.service.PostAccessPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,6 +19,8 @@ import java.util.Optional;
 @Service
 @Transactional
 public class VaultServiceImplementation implements VaultService {
+
+    private final PostAccessPolicy accessPolicy = new PostAccessPolicy();
 
     private final VaultRepository vaultRepository;
     private final UserRepository userRepository;
@@ -32,89 +35,61 @@ public class VaultServiceImplementation implements VaultService {
     @Override
     public Vault addToVaultV1(Long userId, Long postId, String label){
         Post post = lockActivePost(postId);
-        try {
-            if(vaultRepository.existsByUserIdAndPostId(userId, postId)){
-                throw new IllegalStateException("Post already saved to Vault");
-            }
-            User user = userRepository.findById(userId).orElseThrow(()-> new RuntimeException("User not found with ID: " + userId));
-            Vault vault = new Vault();
-            vault.setUser(user);
-            vault.setPost(post);
-            vault.setLabel(label);
-
-            return vaultRepository.save(vault);
-        }catch (Exception e){
-            throw new RuntimeException("Failed to add post to Vault: " + e.getMessage(), e);
+        if (vaultRepository.existsByUserIdAndPostId(userId, postId)) {
+            throw new IllegalStateException("Post already saved to Vault");
         }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new java.util.NoSuchElementException("User not found"));
+        Vault vault = new Vault();
+        vault.setUser(user);
+        vault.setPost(post);
+        vault.setLabel(label);
+        return vaultRepository.save(vault);
     }
 
     @Override
     public void removeFromVaultV1(Long userId, Long postId){
         lockActivePost(postId);
-        try{
-            Optional<Vault> vaultEntry = vaultRepository.findByUserIdAndPostId(userId, postId);
-            if(vaultEntry.isEmpty()){
-                throw new RuntimeException("No vault entry found for this user and post");
-            }
-            vaultRepository.delete(vaultEntry.get());
-        }catch (Exception e){
-            throw new RuntimeException("Failed to remove post from Vault");
-        }
+        Vault entry = vaultRepository.findByUserIdAndPostId(userId, postId)
+                .orElseThrow(() -> new java.util.NoSuchElementException("Vault entry not found"));
+        vaultRepository.delete(entry);
     }
 
     @Override
     public Vault editLabelV1(Long userId, Long postId, String newLabel) {
         lockActivePost(postId);
-        try {
-            Vault vault = vaultRepository.findByUserIdAndPostId(userId, postId).orElseThrow(()-> new RuntimeException("Vault entry not found for this user and post"));
-            vault.setLabel(newLabel);
-            return vaultRepository.save(vault);
-
-        }catch (RuntimeException e){
-            throw new RuntimeException("Failed to edit Vault Label: " + e.getMessage(), e);
-        }catch (Exception e){
-            throw new RuntimeException("An error has occured");
-        }
+        Vault vault = vaultRepository.findByUserIdAndPostId(userId, postId)
+                .orElseThrow(() -> new java.util.NoSuchElementException("Vault entry not found"));
+        vault.setLabel(newLabel);
+        return vaultRepository.save(vault);
     }
 
     @Override
     public List<Vault> getUserVaultV1(Long userId){
-        try {
-            return vaultRepository.findByUserId(userId);
-        }catch (Exception e){
-            throw new RuntimeException("Failed to retrieve user vault: " + e.getMessage(), e);
-        }
-
+        return vaultRepository.findByUserId(userId).stream()
+                .filter(vault -> accessPolicy.canRead(vault.getPost())).toList();
     }
 
     @Override
     public Optional<Vault> getVaultEntryV1(Long id, Long userId) {
-        return vaultRepository.findByIdAndUserId(id, userId);
+        return vaultRepository.findByIdAndUserId(id, userId)
+                .filter(vault -> accessPolicy.canRead(vault.getPost()));
     }
 
     @Override
     public boolean isPostSavedV1(Long userId, Long postId){
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
-        requireActive(post);
-        try {
-            return vaultRepository.existsByUserIdAndPostId(userId, postId);
-        }catch(Exception e){
-            throw new RuntimeException("Failed to check if post is saved: " + e.getMessage());
-        }
+        accessPolicy.requireReadable(post);
+        return vaultRepository.existsByUserIdAndPostId(userId, postId);
     }
 
     private Post lockActivePost(Long postId) {
         postRepository.lockLogicalPostByRowId(postId);
         Post post = postRepository.findByIdForUpdate(postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
-        requireActive(post);
+        accessPolicy.requireReadable(post);
         return post;
     }
 
-    private void requireActive(Post post) {
-        if (post.isDeleted()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found");
-        }
-    }
 }

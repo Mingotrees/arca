@@ -1,6 +1,10 @@
 package com.popman.arca.config;
 
 import com.popman.arca.filter.JwtFilter;
+import com.popman.arca.exceptions.ApiErrors;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
+import java.net.URI;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,7 +40,10 @@ public class SecurityConfig {
   @Autowired
   private JwtFilter jwtFilter;
 
-  @Value("${app.cors.allowed-origins:*}")
+  @Autowired
+  private Environment environment;
+
+  @Value("${app.cors.allowed-origins:}")
   private List<String> allowedOrigins;
 
   @Value("${app.cors.allowed-methods:GET,POST,PUT,DELETE,OPTIONS,PATCH}")
@@ -89,9 +96,9 @@ public class SecurityConfig {
             .anyRequest().authenticated())
         .exceptionHandling(exceptions -> exceptions
             .authenticationEntryPoint((request, response, exception) ->
-                writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED, "unauthorized", "Authentication required"))
+                ApiErrors.write(response, HttpServletResponse.SC_UNAUTHORIZED, "unauthorized", "Authentication required"))
             .accessDeniedHandler((request, response, exception) ->
-                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN, "forbidden", "Access denied")))
+                ApiErrors.write(response, HttpServletResponse.SC_FORBIDDEN, "forbidden", "Access denied")))
         .sessionManagement(session -> session
             .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authenticationProvider(authenticationProvider())
@@ -102,13 +109,14 @@ public class SecurityConfig {
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
-    // Use explicit origins configured in application.properties
-    configuration.setAllowedOrigins(defaultIfEmpty(allowedOrigins, List.of("*")));
+    validateOrigins();
+    configuration.setAllowedOrigins(allowedOrigins);
     configuration
         .setAllowedMethods(defaultIfEmpty(allowedMethods, List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")));
     configuration
         .setAllowedHeaders(defaultIfEmpty(allowedHeaders, List.of("Authorization", "Content-Type", "Cache-Control", "X-Request-ID")));
     configuration.setAllowCredentials(true);
+    configuration.validateAllowCredentials();
     configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition", "X-Request-ID"));
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -120,12 +128,29 @@ public class SecurityConfig {
     return (value == null || value.isEmpty()) ? fallback : value;
   }
 
-  private static void writeJsonError(HttpServletResponse response, int status, String error, String message)
-      throws IOException {
-    response.setStatus(status);
-    response.setCharacterEncoding("UTF-8");
-    response.setContentType("application/json");
-    response.getWriter().write("{\"error\":\"" + error + "\",\"message\":\"" + message + "\"}");
+  private void validateOrigins() {
+    if (allowedOrigins == null || allowedOrigins.isEmpty()) {
+      throw new IllegalArgumentException("Explicit CORS origins are required");
+    }
+    boolean development = environment.acceptsProfiles(Profiles.of("dev", "test"))
+        && !environment.acceptsProfiles(Profiles.of("prod", "production"));
+    for (String origin : allowedOrigins) {
+      URI uri;
+      try { uri = URI.create(origin); }
+      catch (IllegalArgumentException | NullPointerException e) { throw new IllegalArgumentException("Invalid CORS origin"); }
+      String scheme = uri.getScheme();
+      String host = uri.getHost();
+      if (host == null || origin.contains("*") || !("http".equals(scheme) || "https".equals(scheme))
+          || uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null
+          || (uri.getRawPath() != null && !uri.getRawPath().isEmpty())
+          || uri.getPort() < -1 || uri.getPort() == 0 || uri.getPort() > 65535) {
+        throw new IllegalArgumentException("CORS origins must be explicit HTTP(S) origins without paths or wildcards");
+      }
+      boolean loopback = "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host) || "[::1]".equals(host);
+      if (!development && "http".equals(scheme) && !loopback) {
+        throw new IllegalArgumentException("Production CORS origins require HTTPS");
+      }
+    }
   }
 
   @Bean

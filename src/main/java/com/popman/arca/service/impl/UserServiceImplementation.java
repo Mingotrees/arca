@@ -5,6 +5,10 @@ import com.popman.arca.dto.v1.user.UserUpdateRequest;
 import com.popman.arca.entity.User;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.UserService;
+import com.popman.arca.service.media.UploadValidator;
+import com.popman.arca.service.media.MediaStorage;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import jakarta.transaction.Transactional;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
@@ -31,6 +35,8 @@ public class UserServiceImplementation implements UserService {
   private static final Logger logger = LoggerFactory.getLogger(UserServiceImplementation.class);
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
+  private final UploadValidator uploadValidator = new UploadValidator();
+  private final MediaStorage mediaStorage = new MediaStorage();
 
   @Value("${file.upload-dir:uploads}")
   private String uploadDir;
@@ -262,58 +268,39 @@ public class UserServiceImplementation implements UserService {
   }
 
   @Override
+  @Transactional
   public String updateProfilePictureV1(Long userId, MultipartFile file) {
+    Path target = null;
     try {
       validateId(userId);
-
-      if (file == null || file.isEmpty()) {
-        throw new IllegalArgumentException("File must not be null or empty");
+      var upload = uploadValidator.validate(file, true);
+      User user = userRepository.findByIdForUpdate(userId)
+          .orElseThrow(() -> new NoSuchElementException("User not found"));
+      String filename = java.util.UUID.randomUUID() + upload.extension();
+      String relativePath = "profile-pictures/" + filename;
+      target = mediaStorage.destination(uploadDir, "profile-pictures", filename);
+      Files.write(target, upload.bytes(), java.nio.file.StandardOpenOption.CREATE_NEW);
+      Path written = target;
+      String oldPath = user.getProfilePicture();
+      boolean synchronizedTransaction = TransactionSynchronizationManager.isSynchronizationActive();
+      if (synchronizedTransaction) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+          @Override public void afterCommit() { deleteOldProfilePicture(oldPath); }
+          @Override public void afterCompletion(int status) {
+            if (status != STATUS_COMMITTED) cleanupProfilePicture(written);
+          }
+        });
       }
-
-      String contentType = file.getContentType();
-      if (contentType == null || !(contentType.equals("image/jpeg")
-          || contentType.equals("image/png")
-          || contentType.equals("image/webp"))) {
-        throw new IllegalArgumentException("Only image/jpeg, image/png, or image/webp allowed");
-      }
-      byte[] bytes = file.getBytes();
-      if (!hasImageSignature(bytes, contentType)) {
-        throw new IllegalArgumentException("Profile picture content does not match its media type");
-      }
-
-      User user = userRepository.findById(userId)
-          .orElseThrow(() -> new NoSuchElementException("User not found with ID: " + userId));
-
-      String ext = extensionForContentType(contentType);
-      String fileName = "user_" + userId + "_" + System.currentTimeMillis() + "." + ext;
-
-      String relativePath = Paths.get("profile-pictures", fileName).toString();
-      Path targetLocation = prepareProfilePictureTarget(fileName);
-
-      Files.write(targetLocation, bytes);
-
-      String oldPathStr = user.getProfilePicture();
-      if (oldPathStr != null && !oldPathStr.trim().isEmpty()) {
-        try {
-          deleteStoredProfilePicture(oldPathStr);
-        } catch (Exception ex) {
-          logger.warn("Failed to delete old profile picture for user {}: {}", userId, ex.getMessage());
-        }
-      }
-
       user.setProfilePicture(relativePath);
-      userRepository.save(user);
-
-      logger.info("Updated profile picture for user {} -> {}", userId, relativePath);
+      userRepository.saveAndFlush(user);
+      if (!synchronizedTransaction) deleteOldProfilePicture(oldPath);
       return relativePath;
-    } catch (IllegalArgumentException | NoSuchElementException e) {
-      throw e;
     } catch (IOException e) {
-      logger.error("IO error updating profile picture for {}: {}", userId, e.getMessage());
+      if (target != null) cleanupProfilePicture(target);
       throw new RuntimeException("Failed to save profile picture", e);
-    } catch (Exception e) {
-      logger.error("Error updating profile picture for {}: {}", userId, e.getMessage());
-      throw new RuntimeException("Failed to update profile picture", e);
+    } catch (RuntimeException e) {
+      if (target != null) cleanupProfilePicture(target);
+      throw e;
     }
   }
 
@@ -329,7 +316,7 @@ public class UserServiceImplementation implements UserService {
     }
 
     try {
-      Path candidate = resolveStoredProfilePicture(storedPath);
+      Path candidate = mediaStorage.existing(uploadDir, storedPath, "profile-pictures");
       if (!Files.isRegularFile(candidate, LinkOption.NOFOLLOW_LINKS)) {
         throw new NoSuchElementException("Profile picture not found");
       }
@@ -461,65 +448,18 @@ public class UserServiceImplementation implements UserService {
     }
   }
 
-  private Path resolveUnderUploadRoot(String relativePath) {
-    Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
-    Path resolved = root.resolve(relativePath).normalize();
-    if (!resolved.startsWith(root)) {
-      throw new IllegalArgumentException("Invalid profile picture path");
+  private void deleteOldProfilePicture(String storedPath) {
+    if (storedPath == null || storedPath.isBlank()) return;
+    try {
+      Files.deleteIfExists(mediaStorage.existing(uploadDir, storedPath, "profile-pictures"));
+    } catch (IOException | InvalidPathException e) {
+      logger.warn("Could not remove replaced profile picture");
     }
-    return resolved;
   }
 
-  private Path prepareProfilePictureTarget(String fileName) throws IOException {
-    Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
-    Files.createDirectories(root);
-    Path realRoot = root.toRealPath();
-
-    Path profileDirectory = root.resolve("profile-pictures");
-    Files.createDirectories(profileDirectory);
-    Path realProfileDirectory = profileDirectory.toRealPath();
-    if (!realProfileDirectory.startsWith(realRoot)) {
-      throw new IOException("Profile picture directory is outside upload root");
-    }
-
-    Path target = realProfileDirectory.resolve(fileName).normalize();
-    if (!target.startsWith(realProfileDirectory)) {
-      throw new IOException("Invalid profile picture target");
-    }
-    return target;
-  }
-
-  private void deleteStoredProfilePicture(String storedPath) throws IOException {
-    Path candidate = resolveStoredProfilePicture(storedPath);
-    if (!Files.exists(candidate, LinkOption.NOFOLLOW_LINKS)) {
-      return;
-    }
-    Files.deleteIfExists(candidate);
-  }
-
-  private Path resolveStoredProfilePicture(String storedPath) throws IOException {
-    Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
-    Path profileDirectory = root.resolve("profile-pictures").normalize();
-    Path candidate = root.resolve(storedPath).normalize();
-    if (!candidate.startsWith(profileDirectory)) {
-      throw new IOException("Stored profile picture is outside profile picture directory");
-    }
-
-    Path realProfileDirectory = profileDirectory.toRealPath();
-    Path realCandidate = candidate.toRealPath();
-    if (!realCandidate.startsWith(realProfileDirectory)) {
-      throw new IOException("Stored profile picture is outside profile picture directory");
-    }
-    return realCandidate;
-  }
-
-  private String extensionForContentType(String contentType) {
-    return switch (contentType) {
-      case "image/jpeg" -> "jpg";
-      case "image/png" -> "png";
-      case "image/webp" -> "webp";
-      default -> throw new IllegalArgumentException("Unsupported image content type");
-    };
+  private void cleanupProfilePicture(Path path) {
+    try { Files.deleteIfExists(path); }
+    catch (IOException e) { logger.warn("Could not clean up profile picture"); }
   }
 
   private String contentTypeForExtension(Path path) {
@@ -536,31 +476,4 @@ public class UserServiceImplementation implements UserService {
     throw new NoSuchElementException("Profile picture not found");
   }
 
-  private boolean hasImageSignature(byte[] bytes, String contentType) {
-    return switch (contentType) {
-      case "image/jpeg" -> bytes.length >= 3
-          && (bytes[0] & 0xff) == 0xff
-          && (bytes[1] & 0xff) == 0xd8
-          && (bytes[2] & 0xff) == 0xff;
-      case "image/png" -> startsWith(bytes, new byte[] {
-          (byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
-      });
-      case "image/webp" -> bytes.length >= 12
-          && startsWith(bytes, new byte[] {0x52, 0x49, 0x46, 0x46})
-          && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50;
-      default -> false;
-    };
-  }
-
-  private boolean startsWith(byte[] bytes, byte[] prefix) {
-    if (bytes.length < prefix.length) {
-      return false;
-    }
-    for (int i = 0; i < prefix.length; i++) {
-      if (bytes[i] != prefix[i]) {
-        return false;
-      }
-    }
-    return true;
-  }
 }

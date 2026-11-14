@@ -3,7 +3,11 @@ package com.popman.arca.dto.v1.vault;
 
 public class VaultRequest {
 
+    @jakarta.validation.constraints.NotNull
+    @jakarta.validation.constraints.Positive
+    @com.fasterxml.jackson.annotation.JsonProperty("post_id")
     private Long postId;
+    @jakarta.validation.constraints.Size(max = 255)
     private String label;
 
     public VaultRequest() {

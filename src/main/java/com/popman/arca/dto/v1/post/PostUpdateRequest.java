@@ -8,6 +8,7 @@ public class PostUpdateRequest {
 
     private String content;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("post_tag")
     private String postTag;
 
     public PostUpdateRequest() {}

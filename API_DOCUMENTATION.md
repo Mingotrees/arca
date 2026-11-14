@@ -10961,3 +10961,14 @@ This operation does not require authentication
 |files|[[FileResponse](#schemafileresponse)]|false|none|none|
 |isLatestVersion|boolean|false|none|none|
 |latestVersion|boolean|false|none|none|
+# Phase 2 contract update
+
+The current resource-visibility, upload-limit, error-envelope and storage rules are documented in [Phase 2 operations](docs/phase-2-operations.md) and [openapi.yaml](openapi.yaml). Private/pending/rejected/superseded versions are owner/admin-only across posts, files, history, votes and vaults; inaccessible parents return 404. Legacy `user_id` ownership inputs are ignored. Uploads validate content as well as extension/MIME, enforce 10 MiB byte and 25-million-pixel limits, and return 400/413/415 for invalid content. Successful routes and payloads remain compatible. Examples below may predate these tightened rules.
+
+Use snake_case request fields, matching both runtime binding and the updated request schemas:
+
+```json
+{"post_id":42,"vote_type":"UPVOTE"}
+```
+
+The same row-ID field is used for vault additions (`{"post_id":42,"label":"Study"}`) and label edits (`{"post_id":42,"new_label":"Exam"}`). Post creation uses `department_id` and optional `post_tag`; any legacy `user_id` remains ignored.

@@ -12,11 +12,16 @@ public class PostRequest {
     @NotBlank(message = "Content is required")
     private String content;
 
+    @io.swagger.v3.oas.annotations.media.Schema(deprecated = true,
+            description = "Ignored legacy ownership input; owner is always the authenticated JWT principal")
+    @com.fasterxml.jackson.annotation.JsonProperty("user_id")
     private Long userId;
 
     @NotNull(message = "Department ID is required")
+    @com.fasterxml.jackson.annotation.JsonProperty("department_id")
     private Long departmentId;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("post_tag")
     private String postTag;
 
     public PostRequest() {}
