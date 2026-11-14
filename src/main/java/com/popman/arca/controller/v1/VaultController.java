@@ -23,6 +23,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("api/v1/vaults")
+@ApiResponse(responseCode = "401", description = "Authentication required", content = @Content)
 public class VaultController {
 
     private final VaultService vaultService;
@@ -32,23 +33,15 @@ public class VaultController {
     }
 
     @PostMapping("/add")
-    @Operation(description = "Request post_id is a post version database row id, not logical post_id. Deleted posts are inaccessible.")
+    @Operation(description = "Request post_id is a post version database row id, not logical post_id. Parent post must be readable; saved entry belongs to authenticated user.")
+    @ApiResponse(responseCode = "400", description = "Invalid request", content = @Content)
+    @ApiResponse(responseCode = "409", description = "Post already saved by current user", content = @Content)
     @ApiResponse(responseCode = "200", description = "Post saved",
             content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
-    public ResponseEntity<?> addToVault(@AuthenticationPrincipal UserPrincipal userDetails,@RequestBody VaultRequest request){
-        try {
-            Long userId = userDetails.getId();
-            Vault savedVault = vaultService.addToVaultV1(userId, request.getPostId(),request.getLabel());
-            return ResponseEntity.ok(new MessageResponse("Post successfully added to Vault."));
-        }catch (ResponseStatusException e){
-            throw e;
-        }catch (RuntimeException e){
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }catch (Exception e){
-            return ResponseEntity.internalServerError().body("An error has occured");
-        }
-
+    public ResponseEntity<?> addToVault(@AuthenticationPrincipal UserPrincipal userDetails,@jakarta.validation.Valid @RequestBody VaultRequest request){
+        vaultService.addToVaultV1(userDetails.getId(), request.getPostId(), request.getLabel());
+        return ResponseEntity.ok(new MessageResponse("Post successfully added to Vault."));
     }
 
     @DeleteMapping("/remove")
@@ -57,17 +50,8 @@ public class VaultController {
     @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
     public ResponseEntity<?> removeFromVault(@AuthenticationPrincipal UserPrincipal userDetails,
             @Parameter(description = "Post version database row id, not logical post_id") @RequestParam Long postId){
-        try {
-            Long userId = userDetails.getId();
-            vaultService.removeFromVaultV1(userId, postId);
-            return ResponseEntity.ok(new MessageResponse("Post removed from Vault."));
-        }catch (ResponseStatusException e){
-            throw e;
-        }catch (RuntimeException e){
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }catch (Exception e){
-            return ResponseEntity.internalServerError().body("An error occured while removing post from Vault");
-        }
+        vaultService.removeFromVaultV1(userDetails.getId(), postId);
+        return ResponseEntity.ok(new MessageResponse("Post removed from Vault."));
     }
 
 
@@ -76,35 +60,20 @@ public class VaultController {
     @ApiResponse(responseCode = "200", description = "Label updated",
             content = @Content(schema = @Schema(implementation = VaultResponse.class)))
     @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
-    public ResponseEntity<?> editLabel(@AuthenticationPrincipal UserPrincipal userDetails, @RequestBody EditVaultLabelRequest request){
+    public ResponseEntity<?> editLabel(@AuthenticationPrincipal UserPrincipal userDetails, @jakarta.validation.Valid @RequestBody EditVaultLabelRequest request){
 
-        try {
-            Long userId = userDetails.getId();
-            Vault updatedVault = vaultService.editLabelV1(userId, request.getPostId(), request.getNewLabel());
-
-            return ResponseEntity.ok(new VaultResponse(updatedVault));
-        }catch (ResponseStatusException e){
-            throw e;
-        }catch (RuntimeException e){
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }catch (Exception e){
-            return ResponseEntity.internalServerError().body("An error has occurred");
-        }
+        Vault updatedVault = vaultService.editLabelV1(userDetails.getId(), request.getPostId(), request.getNewLabel());
+        return ResponseEntity.ok(new VaultResponse(updatedVault));
     }
 
     @GetMapping("/user")
-    @Operation(description = "Returns saved entries excluding deleted posts; retained entries are hidden, not physically purged.")
+    @Operation(description = "Returns current user's saved entries with readable parent posts only; inaccessible retained entries are hidden, not physically purged.")
     @ApiResponse(responseCode = "200", description = "Saved posts",
             content = @Content(array = @ArraySchema(schema = @Schema(implementation = VaultResponse.class))))
     public ResponseEntity<?> getUserVault(@AuthenticationPrincipal UserPrincipal userDetails){
 
-        try {
-            Long userId = userDetails.getId();
-            List<Vault> vaultList = vaultService.getUserVaultV1(userId);
-            return ResponseEntity.ok(vaultList.stream().map(VaultResponse::new).toList());
-        }catch (Exception e){
-            return ResponseEntity.internalServerError().body("Failed to fetch user vault");
-        }
+        List<Vault> vaultList = vaultService.getUserVaultV1(userDetails.getId());
+        return ResponseEntity.ok(vaultList.stream().map(VaultResponse::new).toList());
     }
 
     @GetMapping("/check/{postId}")
@@ -114,15 +83,7 @@ public class VaultController {
     public ResponseEntity<?> isPostSaved(@AuthenticationPrincipal UserPrincipal userDetails,
             @Parameter(description = "Post version database row id, not logical post_id") @PathVariable Long postId){
 
-        try {
-            Long userId = userDetails.getId();
-            boolean exists = vaultService.isPostSavedV1(userId, postId);
-            return ResponseEntity.ok(exists);
-        }catch (ResponseStatusException e){
-            throw e;
-        }catch (Exception e){
-            return ResponseEntity.internalServerError().body("Error checking post in vault");
-        }
+        return ResponseEntity.ok(vaultService.isPostSavedV1(userDetails.getId(), postId));
     }
 
     @GetMapping("/{id}")

@@ -58,7 +58,7 @@ public class PostController {
 
     @GetMapping("/{rowId}")
     @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = PostResponse.class)))
-    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
+    @ApiResponse(responseCode = "404", description = "Post missing, deleted or inaccessible", content = @Content)
     public ResponseEntity<PostResponse> getPost(
             @Parameter(description = "Post version database row id, not logical post_id") @PathVariable Long rowId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -90,7 +90,8 @@ public class PostController {
 
     @PutMapping("/{rowId}")
     @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = PostUpdateResponse.class)))
-    @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
+    @ApiResponse(responseCode = "403", description = "Visible post may only be modified by owner/admin", content = @Content)
+    @ApiResponse(responseCode = "404", description = "Post missing, deleted or inaccessible", content = @Content)
     public ResponseEntity<PostUpdateResponse> updatePost(
             @Valid @RequestBody PostUpdateRequest updatedPost,
             @Parameter(description = "Post version database row id, not logical post_id") @PathVariable Long rowId,
@@ -112,7 +113,7 @@ public class PostController {
     @ApiResponse(responseCode = "401", description = "Authentication required",
             content = @Content(mediaType = "application/json", schema = @Schema(type = "object"),
                     examples = @ExampleObject(value = "{\"error\":\"unauthorized\",\"message\":\"Authentication required\"}")))
-    @ApiResponse(responseCode = "403", description = "Only owner/admin may delete an active post",
+    @ApiResponse(responseCode = "403", description = "Only owner/admin may delete a visible active post",
             content = @Content(mediaType = "application/json", schema = @Schema(type = "object"),
                     examples = @ExampleObject(value = "{\"timestamp\":\"2026-11-14T09:00:00\",\"status\":403," +
                             "\"error\":\"ResponseStatusException\",\"message\":\"Only post owner or admin may modify this post\"}")))
@@ -152,7 +153,8 @@ public class PostController {
     }
 
     @GetMapping("/history/{postId}")
-    @Operation(description = "Returns active versions for a logical post_id; deleted posts have an empty history list.")
+    @Operation(description = "Returns readable active versions for a logical post_id. Ordinary nonowners see APPROVED versions only; "
+            + "owners/admins also see pending, rejected and superseded versions. Deleted or entirely inaccessible history is an empty array.")
     public ResponseEntity<List<PostResponse>> getPostHistory(
             @Parameter(description = "Logical post_id, not a version database row id") @PathVariable("postId") Integer postId) {
         List<PostResponse> versions = postService.getPostHistoryV1(postId);

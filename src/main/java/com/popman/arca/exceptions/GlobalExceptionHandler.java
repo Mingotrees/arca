@@ -74,16 +74,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleAllExceptions(Exception ex) {
-        return error(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred", ex.getClass().getSimpleName());
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred", "internal_server_error");
     }
 
     private ResponseEntity<Object> error(HttpStatusCode status, String message, String error) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", status.value());
-        body.put("error", error);
-        body.put("message", message);
-
-        return new ResponseEntity<>(body, status);
+        return ResponseEntity.status(status).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(ApiErrors.body(status.value(), error, message));
     }
 }

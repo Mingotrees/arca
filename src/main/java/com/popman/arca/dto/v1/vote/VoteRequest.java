@@ -1,7 +1,13 @@
 package com.popman.arca.dto.v1.vote;
 
 public class VoteRequest {
+    @jakarta.validation.constraints.NotNull
+    @jakarta.validation.constraints.Positive
+    @com.fasterxml.jackson.annotation.JsonProperty("post_id")
     private Long postId;
+    @jakarta.validation.constraints.NotNull
+    @jakarta.validation.constraints.Pattern(regexp = "UPVOTE|DOWNVOTE")
+    @com.fasterxml.jackson.annotation.JsonProperty("vote_type")
     private String voteType; // "UPVOTE" or "DOWNVOTE"
 
     // Constructors

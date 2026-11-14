@@ -18,6 +18,7 @@ import com.popman.arca.repository.PostRepository;
 import com.popman.arca.repository.SubjectRepository;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.PostService;
+import com.popman.arca.service.PostAccessPolicy;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -35,6 +36,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class PostServiceImplementation implements PostService {
+
+    private final PostAccessPolicy accessPolicy = new PostAccessPolicy();
 
     @Autowired
     private PostRepository postRepository;
@@ -58,11 +61,8 @@ public class PostServiceImplementation implements PostService {
     public PostResponse getPostV1(Long rowId, Long actorId, boolean isAdmin) {
         Post post = postRepository.findById(rowId)
                 .orElseThrow(() -> new ResponseStatusException(
-                         HttpStatus.NOT_FOUND, "Post not found with id: " + rowId));
-        requireActive(post);
-        if (!"APPROVED".equals(post.getStatus()) && !isAdmin && !post.getUserId().equals(actorId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Post is not available to this user");
-        }
+                         HttpStatus.NOT_FOUND, "Post not found"));
+        accessPolicy.requireReadable(post, actorId, isAdmin);
         return mapToResponse(post);
     }
 
@@ -276,7 +276,7 @@ public class PostServiceImplementation implements PostService {
     @Override
     public List<PostResponse> getPostHistoryV1(Integer postId) {
         List<Post> versions = postRepository.findAllVersionsByPostId(postId);
-        return versions.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return versions.stream().filter(accessPolicy::canRead).map(this::mapToResponse).collect(Collectors.toList());
     }
 
     @Override
@@ -291,10 +291,7 @@ public class PostServiceImplementation implements PostService {
         postRepository.lockLogicalPostByRowId(rowId);
         Post post = postRepository.findByIdForUpdate(rowId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
-        if (!isAdmin && !post.getUserId().equals(actorId)) {
-            throw new ResponseStatusException(post.isDeleted() ? HttpStatus.NOT_FOUND : HttpStatus.FORBIDDEN,
-                    post.isDeleted() ? "Post not found" : "Only post owner or admin may modify this post");
-        }
+        accessPolicy.requireDeletable(post, actorId, isAdmin);
         postRepository.softDeleteLogicalPost(post.getPost_id(), actorId, LocalDateTime.now());
     }
 
@@ -374,11 +371,8 @@ public class PostServiceImplementation implements PostService {
     private Post getOwnedOrAdminPost(Long rowId, Long actorId, boolean isAdmin) {
         Post post = postRepository.findByIdForUpdate(rowId)
                 .orElseThrow(() -> new ResponseStatusException(
-                         HttpStatus.NOT_FOUND, "Post not found with id: " + rowId));
-        requireActive(post);
-        if (!isAdmin && !post.getUserId().equals(actorId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only post owner or admin may modify this post");
-        }
+                         HttpStatus.NOT_FOUND, "Post not found"));
+        accessPolicy.requireMutable(post, actorId, isAdmin);
         return post;
     }
 

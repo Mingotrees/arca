@@ -2,6 +2,12 @@ openapi: 3.1.0
 info:
   title: arca API
   version: v1
+  description: >-
+    JSON errors use timestamp, status, error and message fields. Resource authorization
+    conceals missing, deleted and inaccessible posts with 404. Owners/admins may
+    read active private versions; other authenticated users may read APPROVED
+    versions only. Vault entry and missing public-avatar reads retain empty 404
+    responses. Successful payloads retain existing field names and response shapes.
 servers:
 - url: https://arca-backend.dcism.org
   description: Production
@@ -29,6 +35,8 @@ paths:
                 $ref: "#/components/schemas/VaultResponse"
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
   /api/v1/user/{userId}:
     get:
       tags:
@@ -116,6 +124,7 @@ paths:
       tags:
       - user-controller
       operationId: updateProfilePicture
+      description: Owner/admin uploads JPEG, PNG or WebP. Maximum 10 MiB per file/request and 25000000 decoded pixels. Public reads remain supported.
       parameters:
       - name: userId
         in: path
@@ -141,6 +150,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ProfilePictureResponse"
+        "400":
+          description: Invalid or mismatched image
+        "401":
+          description: Authentication required
+        "403":
+          description: Only owner/admin may replace avatar
+        "404":
+          description: User not found
+        "413":
+          description: Upload exceeds 10 MiB limit
+        "415":
+          description: Unsupported media type or extension
   /api/v1/subject/{subjectId}:
     get:
       tags:
@@ -244,7 +265,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PostResponse"
         "404":
-          description: Post not found, including deleted posts
+          description: Post missing, deleted or inaccessible
     put:
       tags:
       - post-controller
@@ -270,8 +291,10 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PostUpdateResponse"
+        "403":
+          description: Visible post may only be modified by owner/admin
         "404":
-          description: Post not found, including deleted posts
+          description: Post missing, deleted or inaccessible
     delete:
       tags:
       - post-controller
@@ -312,7 +335,7 @@ paths:
                 error: unauthorized
                 message: Authentication required
         "403":
-          description: Only owner/admin may delete an active post
+          description: Only owner/admin may delete a visible active post
           content:
             application/json:
               schema:
@@ -483,7 +506,7 @@ paths:
       tags:
       - vote-controller
       operationId: vote
-      description: Request post_id is a post version database row id, not logical post_id. Deleted posts are inaccessible.
+      description: Request post_id is a post version database row id, not logical post_id. All operations require parent-post visibility; new votes require APPROVED status even for owner/admin.
       requestBody:
         content:
           application/json:
@@ -501,12 +524,16 @@ paths:
           description: Existing vote removed
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
+        "400":
+          description: Invalid request or vote on a visible non-approved post
   /api/v1/vaults/add:
     post:
       tags:
       - vault-controller
       operationId: addToVault
-      description: Request post_id is a post version database row id, not logical post_id. Deleted posts are inaccessible.
+      description: Request post_id is a post version database row id, not logical post_id. Parent post must be readable; saved entry belongs to authenticated user.
       requestBody:
         content:
           application/json:
@@ -522,6 +549,12 @@ paths:
                 $ref: "#/components/schemas/MessageResponse"
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
+        "400":
+          description: Invalid request
+        "409":
+          description: Post already saved by current user
   /api/v1/user:
     get:
       tags:
@@ -679,9 +712,12 @@ paths:
       tags:
       - file-controller
       operationId: uploadFile
+      description: Owner/admin upload to a post version row. JPEG, PNG or PDF only; at most three files per version, 10 MiB per file and multipart request, and 25000000 decoded pixels per image. Extension, declared MIME and content must agree.
       parameters:
       - name: user_id
         in: query
+        description: Ignored; acting user is the authenticated JWT principal
+        deprecated: true
         required: false
         schema:
           type: integer
@@ -713,8 +749,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MultipleFileUploadRequest"
+        "400":
+          description: Invalid, empty or mismatched upload
+        "403":
+          description: Visible post may only be modified by owner/admin
         "404":
-          description: Post not found, including deleted posts
+          description: Post missing, deleted or inaccessible
+        "413":
+          description: Upload exceeds 10 MiB limit
+        "415":
+          description: Unsupported media type or file extension
+        "401":
+          description: Authentication required
   /api/v1/departments:
     get:
       tags:
@@ -919,6 +965,10 @@ paths:
                 format: int32
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
+        "400":
+          description: Invalid request or vote on a visible non-approved post
   /api/v1/votes/{postId}/my-vote:
     get:
       tags:
@@ -943,6 +993,10 @@ paths:
           description: No current vote
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
+        "400":
+          description: Invalid request or vote on a visible non-approved post
   /api/v1/votes/{postId}/downvotes:
     get:
       tags:
@@ -966,6 +1020,10 @@ paths:
                 format: int32
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
+        "400":
+          description: Invalid request or vote on a visible non-approved post
   /api/v1/vaults/{id}:
     get:
       tags:
@@ -987,12 +1045,14 @@ paths:
                 $ref: "#/components/schemas/VaultResponse"
         "404":
           description: Vault entry not found, including entries of deleted posts
+        "401":
+          description: Authentication required
   /api/v1/vaults/user:
     get:
       tags:
       - vault-controller
       operationId: getUserVault
-      description: Returns saved entries excluding deleted posts; retained entries are hidden, not physically purged.
+      description: Returns current user's saved entries with readable parent posts only; inaccessible retained entries are hidden, not physically purged.
       responses:
         "200":
           description: Saved posts
@@ -1002,6 +1062,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/VaultResponse"
+        "401":
+          description: Authentication required
   /api/v1/vaults/check/{postId}:
     get:
       tags:
@@ -1024,6 +1086,8 @@ paths:
                 type: boolean
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
   /api/v1/user/search:
     get:
       tags:
@@ -1146,7 +1210,7 @@ paths:
       tags:
       - post-controller
       operationId: getPostHistory
-      description: Returns active versions for a logical post_id; deleted posts have an empty history list.
+      description: Returns readable active versions for a logical post_id. Ordinary nonowners see APPROVED versions only; owners/admins also see pending, rejected and superseded versions. Deleted or entirely inaccessible history is an empty array.
       parameters:
       - name: postId
         in: path
@@ -1205,7 +1269,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/FileUploadRequest"
         "404":
-          description: File not found, including files of deleted posts
+          description: File missing or parent post deleted/inaccessible
+        "401":
+          description: Authentication required
   /api/v1/files/download/{id}:
     get:
       tags:
@@ -1220,14 +1286,32 @@ paths:
           format: int64
       responses:
         "200":
-          description: OK
+          description: Attachment from a readable parent post
+          headers:
+            Cache-Control:
+              style: simple
+              schema:
+                type: string
+                enum: [no-store]
+            X-Content-Type-Options:
+              style: simple
+              schema:
+                type: string
+                enum: [nosniff]
+            Content-Disposition:
+              description: attachment with sanitized filename
+              style: simple
+              schema:
+                type: string
           content:
             '*/*':
               schema:
                 type: string
                 format: binary
         "404":
-          description: File not found, including files of deleted posts
+          description: File missing or parent post deleted/inaccessible
+        "401":
+          description: Authentication required
   /api/v1/admin/users:
     get:
       tags:
@@ -1297,6 +1381,10 @@ paths:
           description: Vote removed
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
+        "400":
+          description: Invalid request or vote on a visible non-approved post
   /api/v1/vaults/remove:
     delete:
       tags:
@@ -1319,6 +1407,8 @@ paths:
                 $ref: "#/components/schemas/MessageResponse"
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
   /api/v1/schools/delete/{id}:
     delete:
       tags:
@@ -1366,11 +1456,14 @@ components:
     EditVaultLabelRequest:
       type: object
       properties:
-        postId:
+        post_id:
           type: integer
           format: int64
-        newLabel:
+        new_label:
           type: string
+          maxLength: 255
+          minLength: 0
+      required: [post_id]
     VaultResponse:
       type: object
       properties:
@@ -1473,7 +1566,7 @@ components:
           minLength: 0
         content:
           type: string
-        postTag:
+        post_tag:
           type: string
     PostUpdateResponse:
       type: object
@@ -1530,11 +1623,13 @@ components:
     VoteRequest:
       type: object
       properties:
-        postId:
+        post_id:
           type: integer
           format: int64
-        voteType:
+        vote_type:
           type: string
+          pattern: UPVOTE|DOWNVOTE
+      required: [post_id, vote_type]
     VoteResponse:
       type: object
       properties:
@@ -1552,11 +1647,14 @@ components:
     VaultRequest:
       type: object
       properties:
-        postId:
+        post_id:
           type: integer
           format: int64
         label:
           type: string
+          maxLength: 255
+          minLength: 0
+      required: [post_id]
     RegisterRequest:
       type: object
       properties:
@@ -1578,17 +1676,19 @@ components:
         content:
           type: string
           minLength: 1
-        userId:
+        user_id:
           type: integer
           format: int64
-        departmentId:
+          deprecated: true
+          description: Ignored legacy ownership input; owner is always the authenticated JWT principal
+        department_id:
           type: integer
           format: int64
-        postTag:
+        post_tag:
           type: string
       required:
       - content
-      - departmentId
+      - department_id
       - title
     PostCreateResponse:
       type: object

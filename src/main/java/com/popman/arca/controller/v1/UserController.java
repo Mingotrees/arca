@@ -61,6 +61,13 @@ public class UserController {
     @PutMapping(value = "/{userId}/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ApiResponse(responseCode = "200", description = "Profile picture updated",
             content = @Content(schema = @Schema(implementation = ProfilePictureResponse.class)))
+    @io.swagger.v3.oas.annotations.Operation(description = "Owner/admin uploads JPEG, PNG or WebP. Maximum 10 MiB per file/request and 25000000 decoded pixels. Public reads remain supported.")
+    @ApiResponse(responseCode = "400", description = "Invalid or mismatched image", content = @Content)
+    @ApiResponse(responseCode = "401", description = "Authentication required", content = @Content)
+    @ApiResponse(responseCode = "403", description = "Only owner/admin may replace avatar", content = @Content)
+    @ApiResponse(responseCode = "404", description = "User not found", content = @Content)
+    @ApiResponse(responseCode = "413", description = "Upload exceeds 10 MiB limit", content = @Content)
+    @ApiResponse(responseCode = "415", description = "Unsupported media type or extension", content = @Content)
     public ResponseEntity<?> updateProfilePicture(
             @PathVariable Long userId,
             @RequestParam("file") MultipartFile file,
@@ -68,7 +75,7 @@ public class UserController {
     ){
         if (!principal.getId().equals(userId) && !principal.isAdmin()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "forbidden", "message", "Profile picture can only be changed by its owner or an admin"));
+                    .body(com.popman.arca.exceptions.ApiErrors.body(403, "forbidden", "Profile picture can only be changed by its owner or an admin"));
         }
         String path = userService.updateProfilePictureV1(userId, file);
         ProfilePictureResponse resp = new ProfilePictureResponse(userId, path, "Profile picture updated successfully");
@@ -85,6 +92,8 @@ public class UserController {
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(picture.contentType()))
                     .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"profile-picture\"")
+                    .header("X-Content-Type-Options", "nosniff")
+                    .header(HttpHeaders.CACHE_CONTROL, "no-store")
                     .body(picture.bytes());
         } catch (NoSuchElementException e) {
             return ResponseEntity.notFound().build();

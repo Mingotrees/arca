@@ -20,6 +20,7 @@ Arca is a REST API for sharing academic posts and attachments, organized by scho
 - **Academic taxonomy** — schools, departments, subjects, aliases, and administrator-managed relationships.
 - **Versioned posts** — approval/rejection queues, revision history, owner/admin edits, and logical-post soft deletion that hides every version while retaining stored data.
 - **Resource sharing** — JPEG, PNG, and PDF post attachments, authenticated downloads, upvotes/downvotes, and labeled vault entries.
+- **Resource security** — shared post visibility checks, bounded content-validated uploads, canonical storage containment, transactional avatar replacement, and startup JWT/CORS validation.
 - **Administration** — account and role management, user soft deletion, and banned-email controls.
 - **Operational tooling** — Flyway migrations, OpenAPI documentation, MySQL-backed integration tests, correlated deletion logs, and admin-only health/metrics endpoints.
 
@@ -61,6 +62,7 @@ USER_PASSWORD=local-framework-password
 ```
 
 Generate the `SECRET_KEY` value with `openssl rand -base64 32` and paste it into `.env`. It must decode to at least 32 random bytes. These example passwords are for local development only; `.env` is ignored by Git.
+Startup rejects missing, malformed or undersized signing secrets. Keep a deployment's existing valid secret to preserve issued JWTs.
 
 Token lifetimes are **milliseconds**: the examples above mean 15 minutes and 7 days. `USER_NAME`/`USER_PASSWORD` populate existing Spring Security framework settings; they do **not** create an Arca account or admin user.
 
@@ -124,6 +126,8 @@ Most `/api/v1` routes require `Authorization: Bearer <access_token>`. Authentica
 
 Use [openapi.yaml](openapi.yaml) and the running Swagger UI for request/response contracts. [API_DOCUMENTATION.md](API_DOCUMENTATION.md) provides additional examples; some legacy examples predate the current contract. Post lists currently return unpaged arrays. Posts start in `PENDING_APPROVAL`, titles are limited to 30 characters, and post attachments are limited to three JPEG/PNG/PDF files per version. Default multipart limits are 10 MB per file **and per request**.
 
+Owners/admins can read active private versions; other authenticated users see approved versions only, including through history, files, votes, and vaults. Missing/deleted/inaccessible posts return 404. Uploads enforce extension/MIME/content agreement, 10 MiB byte limits and 25 million decoded pixels; avatar uploads also support WebP. See [Phase 2 operations](docs/phase-2-operations.md) for the visibility matrix, multipart overhead, storage lifecycle and production configuration.
+
 ## Development
 
 ```sh
@@ -184,7 +188,7 @@ Deletion requests expose a safe `X-Request-ID`, content-free outcome logs, and t
 
 ## Roadmap
 
-[The backend roadmap](docs/arca-backend-roadmap.md) defines additive work on the existing `/api/v1` architecture. Phase 1 delivers soft deletion and migration foundations. Later phases cover shared authorization hardening, post search/pagination, password recovery, richer profiles, structured links, admin aggregates, and audit events. Announcements and trending are optional; server-side draft persistence is outside the current backend scope.
+[The backend roadmap](docs/arca-backend-roadmap.md) defines additive work on the existing `/api/v1` architecture. Phase 1 delivers soft deletion and migration foundations; Phase 2 adds shared authorization and media/configuration hardening. Next phases cover post search/pagination, password recovery, richer profiles, structured links, admin aggregates, and audit events. Announcements and trending are optional; server-side draft persistence is outside the current backend scope.
 
 ## Troubleshooting
 

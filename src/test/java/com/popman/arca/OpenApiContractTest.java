@@ -19,7 +19,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint.NONE)
 class OpenApiContractTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
@@ -28,6 +28,9 @@ class OpenApiContractTest {
     void checkedInDeletionContractMatchesGeneratedContractAndLegacyOperationsRemain() throws Exception {
         JsonNode generated = mapper.readTree(mvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        if (Boolean.getBoolean("arca.openapi.export")) {
+            Files.writeString(Path.of("target/openapi-generated.json"), generated.toPrettyString());
+        }
         JsonNode checked;
         try (var stream = Files.newInputStream(Path.of("openapi.yaml"))) {
             checked = mapper.valueToTree(new Yaml().load(stream));
@@ -39,6 +42,10 @@ class OpenApiContractTest {
         assertFalse(generated.at("/components/schemas/PostResponse/properties").has("is_deleted"));
         assertEquals(names(checked.at("/components/schemas/PostResponse/properties")),
                 names(generated.at("/components/schemas/PostResponse/properties")));
+        for (String schema : new String[]{"PostRequest", "PostUpdateRequest", "VoteRequest", "VaultRequest", "EditVaultLabelRequest"}) {
+            assertEquals(checked.path("components").path("schemas").path(schema),
+                    generated.path("components").path("schemas").path(schema), "Request contract drift: " + schema);
+        }
 
         var paths = checked.path("paths").fields();
         while (paths.hasNext()) {
@@ -53,6 +60,7 @@ class OpenApiContractTest {
                 if (path.getKey().startsWith("/api/v1/files") || path.getKey().startsWith("/api/v1/votes")
                         || path.getKey().startsWith("/api/v1/vaults") || path.getKey().equals("/api/v1/posts/{rowId}")
                         || path.getKey().equals("/api/v1/posts/{postId}/approve")
+                        || path.getKey().equals("/api/v1/user/{userId}/profile-picture")
                         || path.getKey().equals("/api/v1/posts/history/{postId}")) {
                     assertEquals(operation.getValue(), generated.path("paths").path(path.getKey()).path(operation.getKey()),
                             "Related-resource contract drift: " + path.getKey() + " " + operation.getKey());

@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/votes")
+@ApiResponse(responseCode = "401", description = "Authentication required", content = @Content)
+@ApiResponse(responseCode = "400", description = "Invalid request or vote on a visible non-approved post", content = @Content)
 public class VoteController {
 
     private final VoteService voteService;
@@ -25,7 +27,8 @@ public class VoteController {
     }
 
     @PostMapping
-    @Operation(description = "Request post_id is a post version database row id, not logical post_id. Deleted posts are inaccessible.")
+    @Operation(description = "Request post_id is a post version database row id, not logical post_id. "
+            + "All operations require parent-post visibility; new votes require APPROVED status even for owner/admin.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Vote saved",
                     content = @Content(schema = @Schema(implementation = VoteResponse.class))),
@@ -33,7 +36,7 @@ public class VoteController {
             @ApiResponse(responseCode = "404", description = "Post not found, including deleted posts", content = @Content)
     })
     public ResponseEntity<VoteResponse> vote(
-            @RequestBody VoteRequest request,
+            @jakarta.validation.Valid @RequestBody VoteRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
         Long userId = userPrincipal.getId();
