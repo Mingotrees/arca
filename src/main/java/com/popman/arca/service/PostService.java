@@ -38,6 +38,8 @@ public interface PostService {
 
     void validateDeleteAccessV1(Long rowId, Long actorId, boolean isAdmin);
 
+    void deletePostV1(Long rowId, Long actorId, boolean isAdmin);
+
     //pending posts per department
     List<PostResponse> getPendingPostsByDepartmentV1(Long departmentId);
 }

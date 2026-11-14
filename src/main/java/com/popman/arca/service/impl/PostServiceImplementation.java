@@ -10,6 +10,8 @@ import com.popman.arca.dto.v1.post.PostUpdateRequest;
 import com.popman.arca.dto.v1.post.PostCreateResponse;
 import com.popman.arca.dto.v1.post.PostUpdateResponse;
 import com.popman.arca.entity.Post;
+import com.popman.arca.entity.PostIdentity;
+import com.popman.arca.repository.PostIdentityRepository;
 import com.popman.arca.entity.Subject;
 import com.popman.arca.repository.DepartmentRepository;
 import com.popman.arca.repository.PostRepository;
@@ -38,6 +40,9 @@ public class PostServiceImplementation implements PostService {
     private PostRepository postRepository;
 
     @Autowired
+    private PostIdentityRepository postIdentityRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -53,7 +58,8 @@ public class PostServiceImplementation implements PostService {
     public PostResponse getPostV1(Long rowId, Long actorId, boolean isAdmin) {
         Post post = postRepository.findById(rowId)
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Post not found with id: " + rowId));
+                         HttpStatus.NOT_FOUND, "Post not found with id: " + rowId));
+        requireActive(post);
         if (!"APPROVED".equals(post.getStatus()) && !isAdmin && !post.getUserId().equals(actorId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Post is not available to this user");
         }
@@ -109,7 +115,7 @@ public class PostServiceImplementation implements PostService {
         departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(()-> new NoSuchElementException("Department not found with id " + request.getDepartmentId()));
 
-        Integer nextPostId = postRepository.getNextPostId();
+        Integer nextPostId = postIdentityRepository.saveAndFlush(new PostIdentity(actorId)).getId();
 
         Post post = new Post();
         post.setPost_id(nextPostId);
@@ -147,6 +153,7 @@ public class PostServiceImplementation implements PostService {
     @Transactional
     public PostUpdateResponse updatePostV1(
             PostUpdateRequest updateRequest, Long rowId, Long actorId, boolean isAdmin) {
+        postRepository.lockLogicalPostByRowId(rowId);
         Post currentPost = getOwnedOrAdminPost(rowId, actorId, isAdmin);
 
         if (!"APPROVED".equals(currentPost.getStatus())) {
@@ -210,8 +217,10 @@ public class PostServiceImplementation implements PostService {
     @Override
     @Transactional
     public String approvePostV1(PostApprovalRequest approvalRequest, Long postId) {
-        Post post = postRepository.findById(postId)
+        postRepository.lockLogicalPostByRowId(postId);
+        Post post = postRepository.findByIdForUpdate(postId)
                 .orElseThrow(() -> new NoSuchElementException("Post not found with id: " + postId));
+        requireActive(post);
 
         // Validate that the post is pending approval
         if (!"PENDING_APPROVAL".equals(post.getStatus())) {
@@ -271,8 +280,22 @@ public class PostServiceImplementation implements PostService {
     }
 
     @Override
+    @Transactional
     public void validateDeleteAccessV1(Long rowId, Long actorId, boolean isAdmin) {
         getOwnedOrAdminPost(rowId, actorId, isAdmin);
+    }
+
+    @Override
+    @Transactional
+    public void deletePostV1(Long rowId, Long actorId, boolean isAdmin) {
+        postRepository.lockLogicalPostByRowId(rowId);
+        Post post = postRepository.findByIdForUpdate(rowId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
+        if (!isAdmin && !post.getUserId().equals(actorId)) {
+            throw new ResponseStatusException(post.isDeleted() ? HttpStatus.NOT_FOUND : HttpStatus.FORBIDDEN,
+                    post.isDeleted() ? "Post not found" : "Only post owner or admin may modify this post");
+        }
+        postRepository.softDeleteLogicalPost(post.getPost_id(), actorId, LocalDateTime.now());
     }
 
     @Override
@@ -349,13 +372,20 @@ public class PostServiceImplementation implements PostService {
     }
 
     private Post getOwnedOrAdminPost(Long rowId, Long actorId, boolean isAdmin) {
-        Post post = postRepository.findById(rowId)
+        Post post = postRepository.findByIdForUpdate(rowId)
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Post not found with id: " + rowId));
+                         HttpStatus.NOT_FOUND, "Post not found with id: " + rowId));
+        requireActive(post);
         if (!isAdmin && !post.getUserId().equals(actorId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only post owner or admin may modify this post");
         }
         return post;
+    }
+
+    private void requireActive(Post post) {
+        if (post.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found");
+        }
     }
 
 

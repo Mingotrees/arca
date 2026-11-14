@@ -62,8 +62,12 @@ public class FileServiceImplementation implements FileService {
     if (actorId == null || postId == null) {
       throw new IllegalArgumentException("actorId and postId must not be null");
     }
+    postRepository.lockLogicalPostByRowId(postId);
     Post post = postRepository.findByIdForUpdate(postId)
         .orElseThrow(() -> new NoSuchElementException("Post not found with id " + postId));
+    if (post.isDeleted()) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found");
+    }
     if (!actorIsAdmin && !actorId.equals(post.getUserId())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only post owner or admin can upload files");
     }
@@ -209,7 +213,7 @@ public class FileServiceImplementation implements FileService {
 
   @Override
   public Resource downloadFileV1(Long id) throws IOException {
-    File fileEntity = fileRepository.findById(id)
+    File fileEntity = getFileV1(id)
         .orElseThrow(() -> new NoSuchElementException("File not found with id " + id));
 
     try {
@@ -228,7 +232,7 @@ public class FileServiceImplementation implements FileService {
 
   @Override
   public String getFileContentTypeV1(Long id) throws IOException {
-    File fileEntity = fileRepository.findById(id)
+    File fileEntity = getFileV1(id)
         .orElseThrow(() -> new NoSuchElementException("File not found with id " + id));
 
     Path path = resolveStoredPath(fileEntity);
@@ -243,7 +247,7 @@ public class FileServiceImplementation implements FileService {
 
   @Override
   public Optional<File> getFileV1(Long id) {
-    return fileRepository.findById(id);
+    return fileRepository.findByIdAndPostIsDeletedFalse(id);
   }
 
   private Path resolveStoredPath(File fileEntity) throws IOException {

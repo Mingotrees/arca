@@ -53,6 +53,7 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .requestMatchers("/api/v1/auth/**").permitAll()
+            .requestMatchers("/actuator/**").hasAuthority("ROLE_ADMIN")
             .requestMatchers(HttpMethod.GET, "/api/v1/user/*/profile-picture").permitAll()
             .requestMatchers("/api/v1/admin/**").hasAuthority("ROLE_ADMIN")
             .requestMatchers(HttpMethod.GET, "/api/v1/user/me").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN")
@@ -106,9 +107,9 @@ public class SecurityConfig {
     configuration
         .setAllowedMethods(defaultIfEmpty(allowedMethods, List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")));
     configuration
-        .setAllowedHeaders(defaultIfEmpty(allowedHeaders, List.of("Authorization", "Content-Type", "Cache-Control")));
+        .setAllowedHeaders(defaultIfEmpty(allowedHeaders, List.of("Authorization", "Content-Type", "Cache-Control", "X-Request-ID")));
     configuration.setAllowCredentials(true);
-    configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
+    configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition", "X-Request-ID"));
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", configuration);

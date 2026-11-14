@@ -4074,164 +4074,52 @@ This operation does not require authentication
 
 <a id="opIddeletePost"></a>
 
-> Code samples
+`DELETE /api/v1/posts/{rowId}`
+
+Requires `Authorization: Bearer <access-token>` and post ownership or `ROLE_ADMIN`.
+`rowId` is the database `id` of **any version**, not the logical `post_id`.
+One transaction soft-deletes every version sharing that logical `post_id`.
 
 ```shell
-# You can also use wget
-curl -X DELETE http://localhost:8080/api/v1/posts/{postId} \
-  -H 'Accept: */*'
-
+curl -i -X DELETE http://localhost:20255/api/v1/posts/42 \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-```http
-DELETE http://localhost:8080/api/v1/posts/{postId} HTTP/1.1
-Host: localhost:8080
-Accept: */*
-
-```
-
-```javascript
-
-const headers = {
-  'Accept':'*/*'
-};
-
-fetch('http://localhost:8080/api/v1/posts/{postId}',
-{
-  method: 'DELETE',
-
-  headers: headers
-})
-.then(function(res) {
-    return res.json();
-}).then(function(body) {
-    console.log(body);
-});
-
-```
-
-```ruby
-require 'rest-client'
-require 'json'
-
-headers = {
-  'Accept' => '*/*'
-}
-
-result = RestClient.delete 'http://localhost:8080/api/v1/posts/{postId}',
-  params: {
-  }, headers: headers
-
-p JSON.parse(result)
-
-```
-
-```python
-import requests
-headers = {
-  'Accept': '*/*'
-}
-
-r = requests.delete('http://localhost:8080/api/v1/posts/{postId}', headers = headers)
-
-print(r.json())
-
-```
-
-```php
-<?php
-
-require 'vendor/autoload.php';
-
-$headers = array(
-    'Accept' => '*/*',
-);
-
-$client = new \GuzzleHttp\Client();
-
-// Define array of request body.
-$request_body = array();
-
-try {
-    $response = $client->request('DELETE','http://localhost:8080/api/v1/posts/{postId}', array(
-        'headers' => $headers,
-        'json' => $request_body,
-       )
-    );
-    print_r($response->getBody()->getContents());
- }
- catch (\GuzzleHttp\Exception\BadResponseException $e) {
-    // handle exception or api errors.
-    print_r($e->getMessage());
- }
-
- // ...
-
-```
-
-```java
-URL obj = new URL("http://localhost:8080/api/v1/posts/{postId}");
-HttpURLConnection con = (HttpURLConnection) obj.openConnection();
-con.setRequestMethod("DELETE");
-int responseCode = con.getResponseCode();
-BufferedReader in = new BufferedReader(
-    new InputStreamReader(con.getInputStream()));
-String inputLine;
-StringBuffer response = new StringBuffer();
-while ((inputLine = in.readLine()) != null) {
-    response.append(inputLine);
-}
-in.close();
-System.out.println(response.toString());
-
-```
-
-```go
-package main
-
-import (
-       "bytes"
-       "net/http"
-)
-
-func main() {
-
-    headers := map[string][]string{
-        "Accept": []string{"*/*"},
-    }
-
-    data := bytes.NewBuffer([]byte{jsonReq})
-    req, err := http.NewRequest("DELETE", "http://localhost:8080/api/v1/posts/{postId}", data)
-    req.Header = headers
-
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    // ...
-}
-
-```
-
-`DELETE /api/v1/posts/{postId}`
+Success returns **204 No Content**. Do not parse a JSON response body.
+Responses include a safe `X-Request-ID` correlation header. Clients may submit
+their own 1–64 character ID using letters, digits, dots, underscores or hyphens;
+missing or invalid values are replaced by a UUID.
+Repeating deletion as the owner/admin returns 204 and preserves the original
+`deleted_at`/`deleted_by`. Another user receives 403 for an active post and 404
+for a deleted post. A missing row returns 404; an unauthenticated request returns 401.
 
 <h3 id="deletepost-parameters">Parameters</h3>
 
 |Name|In|Type|Required|Description|
 |---|---|---|---|---|
-|postId|path|integer(int64)|true|none|
-
-> Example responses
-
-> 200 Response
+|rowId|path|integer(int64)|true|Database row ID of any version; not logical `post_id`|
 
 <h3 id="deletepost-responses">Responses</h3>
 
 |Status|Meaning|Description|Schema|
 |---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|OK|string|
+|204|No Content|Every version deleted, or already deleted by an authorized caller|none|
+|401|Unauthorized|Authentication required|JSON `error`, `message`|
+|403|Forbidden|Active post exists but caller is neither owner nor admin|JSON `timestamp`, `status`, `error`, `message`|
+|404|Not Found|Missing row or deleted post inaccessible to caller|JSON `timestamp`, `status`, `error`, `message`|
 
-<aside class="success">
-This operation does not require authentication
-</aside>
+Deleted versions disappear from post lists, moderation queues, history, and
+vault lists. Direct post/file/vault-entry reads, file downloads/uploads,
+post edits/moderation, vote operations/counts, and vault add/edit/check/remove
+operations return 404 for deleted posts. History and list endpoints keep their
+existing list response shapes (possibly empty). Normal `PostResponse` fields
+remain unchanged; deletion metadata is internal.
+
+Version rows, attachment metadata and bytes, votes, and vault entries are retained
+indefinitely initially. Deletion does not physically purge content or provide a
+restore API. Previously downloaded copies cannot be revoked.
+
+Operational rollout and baseline instructions: [`docs/phase-1-operations.md`](docs/phase-1-operations.md).
 
 ## createPost
 
@@ -11073,4 +10961,3 @@ This operation does not require authentication
 |files|[[FileResponse](#schemafileresponse)]|false|none|none|
 |isLatestVersion|boolean|false|none|none|
 |latestVersion|boolean|false|none|none|
-

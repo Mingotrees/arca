@@ -13,6 +13,7 @@ paths:
       tags:
       - vault-controller
       operationId: editLabel
+      description: Request post_id is a post version database row id, not logical post_id. Deleted posts are inaccessible.
       requestBody:
         content:
           application/json:
@@ -26,6 +27,8 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/VaultResponse"
+        "404":
+          description: Post not found, including deleted posts
   /api/v1/user/{userId}:
     get:
       tags:
@@ -228,6 +231,7 @@ paths:
       parameters:
       - name: rowId
         in: path
+        description: Post version database row id, not logical post_id
         required: true
         schema:
           type: integer
@@ -239,6 +243,8 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PostResponse"
+        "404":
+          description: Post not found, including deleted posts
     put:
       tags:
       - post-controller
@@ -246,6 +252,7 @@ paths:
       parameters:
       - name: rowId
         in: path
+        description: Post version database row id, not logical post_id
         required: true
         schema:
           type: integer
@@ -263,20 +270,69 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PostUpdateResponse"
+        "404":
+          description: Post not found, including deleted posts
     delete:
       tags:
       - post-controller
       operationId: deletePost
+      summary: Soft-delete a logical post
+      description: Owner/admin soft-deletes every version sharing the logical post_id. Rows and files are retained; repeated authorized deletion returns 204.
+      security:
+      - bearerAuth: []
       parameters:
+      - name: X-Request-ID
+        in: header
+        description: "Optional correlation ID: 1-64 letters, digits, dots, underscores or hyphens; invalid values are replaced by a UUID"
+        schema:
+          type: string
       - name: rowId
         in: path
+        description: Database row id of any version, not logical post_id
         required: true
         schema:
           type: integer
           format: int64
       responses:
-        "501":
-          description: Post deletion is not implemented
+        "204":
+          description: Logical post deleted; no response body
+          headers:
+            X-Request-ID:
+              description: Safe request correlation ID
+              style: simple
+              schema:
+                type: string
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                error: unauthorized
+                message: Authentication required
+        "403":
+          description: Only owner/admin may delete an active post
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                timestamp: "2026-11-14T09:00:00"
+                status: 403
+                error: ResponseStatusException
+                message: Only post owner or admin may modify this post
+        "404":
+          description: Row missing or deleted post inaccessible to caller
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                timestamp: "2026-11-14T09:00:00"
+                status: 404
+                error: ResponseStatusException
+                message: Post not found
   /api/v1/departments/{id}:
     get:
       tags:
@@ -427,6 +483,7 @@ paths:
       tags:
       - vote-controller
       operationId: vote
+      description: Request post_id is a post version database row id, not logical post_id. Deleted posts are inaccessible.
       requestBody:
         content:
           application/json:
@@ -442,11 +499,14 @@ paths:
                 $ref: "#/components/schemas/VoteResponse"
         "204":
           description: Existing vote removed
+        "404":
+          description: Post not found, including deleted posts
   /api/v1/vaults/add:
     post:
       tags:
       - vault-controller
       operationId: addToVault
+      description: Request post_id is a post version database row id, not logical post_id. Deleted posts are inaccessible.
       requestBody:
         content:
           application/json:
@@ -460,6 +520,8 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: Post not found, including deleted posts
   /api/v1/user:
     get:
       tags:
@@ -592,6 +654,7 @@ paths:
       parameters:
       - name: postId
         in: path
+        description: Post version database row id, not logical post_id
         required: true
         schema:
           type: integer
@@ -609,6 +672,8 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: Post not found, including deleted posts
   /api/v1/files/upload:
     post:
       tags:
@@ -623,6 +688,7 @@ paths:
           format: int64
       - name: post_id
         in: query
+        description: Post version database row id, not logical post_id
         required: true
         schema:
           type: integer
@@ -647,6 +713,8 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MultipleFileUploadRequest"
+        "404":
+          description: Post not found, including deleted posts
   /api/v1/departments:
     get:
       tags:
@@ -836,6 +904,7 @@ paths:
       parameters:
       - name: postId
         in: path
+        description: Post version database row id, not logical post_id
         required: true
         schema:
           type: integer
@@ -848,6 +917,8 @@ paths:
               schema:
                 type: integer
                 format: int32
+        "404":
+          description: Post not found, including deleted posts
   /api/v1/votes/{postId}/my-vote:
     get:
       tags:
@@ -856,6 +927,7 @@ paths:
       parameters:
       - name: postId
         in: path
+        description: Post version database row id, not logical post_id
         required: true
         schema:
           type: integer
@@ -869,6 +941,8 @@ paths:
                 $ref: "#/components/schemas/VoteResponse"
         "204":
           description: No current vote
+        "404":
+          description: Post not found, including deleted posts
   /api/v1/votes/{postId}/downvotes:
     get:
       tags:
@@ -877,6 +951,7 @@ paths:
       parameters:
       - name: postId
         in: path
+        description: Post version database row id, not logical post_id
         required: true
         schema:
           type: integer
@@ -889,6 +964,8 @@ paths:
               schema:
                 type: integer
                 format: int32
+        "404":
+          description: Post not found, including deleted posts
   /api/v1/vaults/{id}:
     get:
       tags:
@@ -908,11 +985,14 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/VaultResponse"
+        "404":
+          description: Vault entry not found, including entries of deleted posts
   /api/v1/vaults/user:
     get:
       tags:
       - vault-controller
       operationId: getUserVault
+      description: Returns saved entries excluding deleted posts; retained entries are hidden, not physically purged.
       responses:
         "200":
           description: Saved posts
@@ -930,6 +1010,7 @@ paths:
       parameters:
       - name: postId
         in: path
+        description: Post version database row id, not logical post_id
         required: true
         schema:
           type: integer
@@ -941,6 +1022,8 @@ paths:
             '*/*':
               schema:
                 type: boolean
+        "404":
+          description: Post not found, including deleted posts
   /api/v1/user/search:
     get:
       tags:
@@ -1063,9 +1146,11 @@ paths:
       tags:
       - post-controller
       operationId: getPostHistory
+      description: Returns active versions for a logical post_id; deleted posts have an empty history list.
       parameters:
       - name: postId
         in: path
+        description: Logical post_id, not a version database row id
         required: true
         schema:
           type: integer
@@ -1119,6 +1204,8 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/FileUploadRequest"
+        "404":
+          description: File not found, including files of deleted posts
   /api/v1/files/download/{id}:
     get:
       tags:
@@ -1139,6 +1226,8 @@ paths:
               schema:
                 type: string
                 format: binary
+        "404":
+          description: File not found, including files of deleted posts
   /api/v1/admin/users:
     get:
       tags:
@@ -1198,6 +1287,7 @@ paths:
       parameters:
       - name: postId
         in: path
+        description: Post version database row id, not logical post_id
         required: true
         schema:
           type: integer
@@ -1205,6 +1295,8 @@ paths:
       responses:
         "204":
           description: Vote removed
+        "404":
+          description: Post not found, including deleted posts
   /api/v1/vaults/remove:
     delete:
       tags:
@@ -1213,6 +1305,7 @@ paths:
       parameters:
       - name: postId
         in: query
+        description: Post version database row id, not logical post_id
         required: true
         schema:
           type: integer
@@ -1224,6 +1317,8 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: Post not found, including deleted posts
   /api/v1/schools/delete/{id}:
     delete:
       tags:
@@ -1262,6 +1357,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     EditVaultLabelRequest:
       type: object

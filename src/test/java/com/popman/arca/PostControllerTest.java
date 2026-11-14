@@ -27,7 +27,7 @@ class PostControllerTest {
     }
 
     @Test
-    void deleteReturnsNotImplementedAfterAccessValidation() {
+    void deleteReturnsNoContent() {
         PostService postService = mock(PostService.class);
         UserPrincipal principal = mock(UserPrincipal.class);
         when(principal.getId()).thenReturn(7L);
@@ -36,7 +36,6 @@ class PostControllerTest {
 
         ResponseEntity<Void> response = controller.deletePost(4L, principal);
 
-        verify(postService).validateDeleteAccessV1(4L, 7L, false);
-        assertEquals(HttpStatus.NOT_IMPLEMENTED, response.getStatusCode());
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
     }
 }

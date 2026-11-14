@@ -47,7 +47,7 @@ class VoteServiceImplementationTest {
         Post post = new Post();
         post.setStatus("PENDING_APPROVAL");
         VoteRequest request = new VoteRequest(5L, "UPVOTE");
-        when(postRepository.findById(5L)).thenReturn(Optional.of(post));
+        when(postRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(post));
 
         assertThrows(IllegalArgumentException.class,
                 () -> service.createOrUpdateVoteV1(request, 3L));
@@ -67,7 +67,7 @@ class VoteServiceImplementationTest {
         vote.setUser(user);
         vote.setVoteType("UPVOTE");
         VoteRequest request = new VoteRequest(5L, "UPVOTE");
-        when(postRepository.findById(5L)).thenReturn(Optional.of(post));
+        when(postRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(post));
         when(userRepository.findById(3L)).thenReturn(Optional.of(user));
         when(voteRepository.findByPostIdAndUserId(5L, 3L)).thenReturn(Optional.of(vote));
 
