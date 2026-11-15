@@ -69,6 +69,15 @@ class OpenApiContractTest {
                 checked.path("paths").path("/api/v1/user/{userId}/cover-picture"));
         assertEquals(0, generated.path("paths").path("/api/v1/user/{userId}/cover-picture").path("get").path("security").size());
         assertEquals(generated.at("/components/schemas/CoverPictureResponse"), checked.at("/components/schemas/CoverPictureResponse"));
+        for (String schema : new String[]{"PostLinkRequest", "PostLinkResponse"}) {
+            assertEquals(generated.path("components").path("schemas").path(schema), checked.path("components").path("schemas").path(schema), "Link schema drift: " + schema);
+        }
+        for (String schema : new String[]{"PostLinkRequest", "PostLinkResponse", "PostRequest", "PostUpdateRequest"}) {
+            String property = schema.startsWith("PostLink") ? "label" : "links";
+            JsonNode type = generated.path("components").path("schemas").path(schema).path("properties").path(property).path("type");
+            assertTrue(type.isArray(), schema + "." + property + " must support null");
+            assertTrue(mapper.convertValue(type, java.util.List.class).contains("null"));
+        }
 
         var paths = checked.path("paths").fields();
         while (paths.hasNext()) {

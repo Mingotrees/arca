@@ -31,6 +31,11 @@ public class PostResponse {
     private Integer downvoteCount;
     private List<FileResponse> files;
 
+    @io.swagger.v3.oas.annotations.media.Schema(description = "Ordered links belonging to this version; empty array for none")
+    private List<PostLinkResponse> links = List.of();
+    public List<PostLinkResponse> getLinks() { return links; }
+    public void setLinks(List<PostLinkResponse> links) { this.links = links; }
+
     public PostResponse() {}
 
     public Integer getUpvoteCount() {

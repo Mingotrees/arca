@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 public class PostServiceImplementation implements PostService {
 
     private final PostAccessPolicy accessPolicy = new PostAccessPolicy();
+    private final com.popman.arca.service.links.PostLinkValidator linkValidator = new com.popman.arca.service.links.PostLinkValidator();
 
     @Autowired
     private PostSearchRepository searchRepository;
@@ -62,6 +63,7 @@ public class PostServiceImplementation implements PostService {
             var postsById = postRepository.findSearchPageDetails(result.ids()).stream()
                     .collect(Collectors.toMap(Post::getId, post -> post));
             postRepository.fetchSearchPageFiles(result.ids());
+            postRepository.fetchSearchPageLinks(result.ids());
             var votes = voteRepository.countSearchPageVotes(result.ids()).stream()
                     .collect(Collectors.toMap(VoteRepository.PostVoteCounts::getPostId, counts -> counts));
             content = result.ids().stream().map(id -> {
@@ -146,6 +148,7 @@ public class PostServiceImplementation implements PostService {
     @Override
     @Transactional
     public PostCreateResponse createPostV1(PostRequest request, Long actorId) {
+        var links = linkValidator.validate(request.getLinks());
         userRepository.findById(actorId)
                 .orElseThrow(() -> new NoSuchElementException("User not found with Id " + actorId));
 
@@ -165,6 +168,7 @@ public class PostServiceImplementation implements PostService {
         post.setStatus("PENDING_APPROVAL");
         post.setUpdatedAt(LocalDateTime.now());
         post.setCreatedAt(LocalDateTime.now());
+        links.forEach(post::addLink);
 
         if(request.getPostTag() != null && !request.getPostTag().isEmpty()){
             Subject subject = subjectRepository.findById(Long.parseLong(request.getPostTag()))
@@ -197,6 +201,10 @@ public class PostServiceImplementation implements PostService {
             throw new IllegalStateException("Only approved posts can be updated. Current status: " + currentPost.getStatus());
         }
 
+        var links = updateRequest.getLinks() == null
+                ? currentPost.getLinks().stream().map(com.popman.arca.entity.PostLink::copy).toList()
+                : linkValidator.validate(updateRequest.getLinks());
+
         Integer maxVersion = postRepository.findMaxVersionByPostId(currentPost.getPost_id());
         postRepository.updateIsLatestVersionByPostId(currentPost.getPost_id(), false);
 
@@ -211,6 +219,7 @@ public class PostServiceImplementation implements PostService {
         newVersion.setIsLatestVersion(true);
         newVersion.setCreatedAt(LocalDateTime.now());
         newVersion.setUpdatedAt(LocalDateTime.now());
+        links.forEach(newVersion::addLink);
 
         if (updateRequest.getPostTag() != null && !updateRequest.getPostTag().isEmpty()) {
             Subject subject = subjectRepository.findById(Long.parseLong(updateRequest.getPostTag()))
@@ -364,6 +373,8 @@ public class PostServiceImplementation implements PostService {
         response.setIsLatestVersion(post.getIsLatestVersion());
         response.setCreatedAt(post.getCreatedAt());
         response.setUpdatedAt(post.getUpdatedAt());
+        response.setLinks(post.getLinks().stream().map(link -> new com.popman.arca.dto.v1.post.PostLinkResponse(
+                link.getUrl(), link.getLabel(), link.getPosition())).toList());
 
         List<PostSubjectResponse> subjects = post.getSubjects() == null
                 ? List.of()

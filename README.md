@@ -121,6 +121,7 @@ Most `/api/v1` routes require `Authorization: Bearer <access_token>`. Authentica
 | Profiles | `/api/v1/user/me`, `/api/v1/user/search`, `/api/v1/user/{userId}/profile-picture`, `/api/v1/user/{userId}/cover-picture` |
 | Profile statistics | `/api/v1/user/{userId}/stats`, `/api/v1/subject/{subjectId}/stats` — aggregate DTOs, authenticated profile access |
 | Posts | `/api/v1/posts`, `/mine`, `/subject/{subjectId}`, `/department/{departmentId}`, `/user/{userId}` under the posts prefix |
+| Post links | Optional ordered `links` on post create/update; version-owned responses, HTTP(S)-only, no server-side fetching. [Contract and V8 rollout](docs/phase-7-operations.md) |
 | Search | `/api/v1/posts/search` — combined filters and stable paged results; legacy lists remain arrays |
 | Moderation and history | `/api/v1/posts/pending`, `/api/v1/posts/{postId}/approve`, `/api/v1/posts/history/{postId}` |
 | Attachments | `/api/v1/files/upload`, `/api/v1/files/{id}`, `/api/v1/files/download/{id}` |

@@ -10961,6 +10961,10 @@ This operation does not require authentication
 |files|[[FileResponse](#schemafileresponse)]|false|none|none|
 |isLatestVersion|boolean|false|none|none|
 |latestVersion|boolean|false|none|none|
+# Phase 7 contract update
+
+Post create/update accepts optional ordered `links` (`url`, optional `label`), maximum 10. Only valid absolute HTTP(S) URLs without credentials are accepted; canonical duplicates and invalid/overlong links return 400 atomically. Omitted/null update copies source-version links; `[]` clears links only in the new version. Read/list/search/history `PostResponse` adds `links` (`url`, `label`, zero-based `position`), defaulting to `[]`. Parent visibility/deletion applies unchanged; backend never fetches submitted destinations. See [Phase 7 operations](docs/phase-7-operations.md) and [openapi.yaml](openapi.yaml) for exact limits, normalization, version semantics and V8 rollout.
+
 # Phase 6 contract update
 
 `/api/v1/user/{userId}/cover-picture`: owner/admin `PUT` accepts multipart `file` and returns `user_id`, `cover_picture`, `message`; public `GET` returns binary JPEG/PNG/WebP with no-store/nosniff headers; owner/admin `DELETE` returns a message and is idempotent for an existing user without a cover. Missing user/reference/object reads return 404. `UserResponse` adds optional read-only `cover_picture` (relative storage key, omitted when absent). Covers use the existing 10 MiB/25-million-pixel image validator and separate `cover-pictures/` storage with commit/rollback-aware cleanup. See [Phase 6 operations](docs/phase-6-operations.md) and [openapi.yaml](openapi.yaml) for authorization, errors, V7 rollout and cleanup assumptions.
