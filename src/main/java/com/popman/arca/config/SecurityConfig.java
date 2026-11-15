@@ -62,7 +62,7 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
                     "/api/v1/auth/logout", "/api/v1/auth/password-recovery", "/api/v1/auth/password-reset").permitAll()
             .requestMatchers("/actuator/**").hasAuthority("ROLE_ADMIN")
-            .requestMatchers(HttpMethod.GET, "/api/v1/user/*/profile-picture").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/user/*/profile-picture", "/api/v1/user/*/cover-picture").permitAll()
             .requestMatchers("/api/v1/admin/**").hasAuthority("ROLE_ADMIN")
             .requestMatchers(HttpMethod.GET, "/api/v1/user/me").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN")
             .requestMatchers(HttpMethod.PATCH, "/api/v1/user/me").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN")

@@ -41,6 +41,10 @@ public class User {
     @Column(length = 50)
     private String bio;
     private String profilePicture;
+    private String coverPicture;
+
+    public String getCoverPicture() { return coverPicture; }
+    public void setCoverPicture(String coverPicture) { this.coverPicture = coverPicture; }
 
     @JsonIgnore
     @Column(name = "is_deleted")

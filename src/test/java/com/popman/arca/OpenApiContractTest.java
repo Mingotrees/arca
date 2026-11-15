@@ -65,6 +65,10 @@ class OpenApiContractTest {
         }
         assertFalse(generated.at("/components/schemas/User/properties").has("timestamps_approximate"));
         assertFalse(generated.at("/components/schemas/User/properties").has("timestampsApproximate"));
+        assertEquals(generated.path("paths").path("/api/v1/user/{userId}/cover-picture"),
+                checked.path("paths").path("/api/v1/user/{userId}/cover-picture"));
+        assertEquals(0, generated.path("paths").path("/api/v1/user/{userId}/cover-picture").path("get").path("security").size());
+        assertEquals(generated.at("/components/schemas/CoverPictureResponse"), checked.at("/components/schemas/CoverPictureResponse"));
 
         var paths = checked.path("paths").fields();
         while (paths.hasNext()) {
