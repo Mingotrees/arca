@@ -42,7 +42,7 @@ class OpenApiContractTest {
         assertFalse(generated.at("/components/schemas/PostResponse/properties").has("is_deleted"));
         assertEquals(names(checked.at("/components/schemas/PostResponse/properties")),
                 names(generated.at("/components/schemas/PostResponse/properties")));
-        for (String schema : new String[]{"PostRequest", "PostUpdateRequest", "VoteRequest", "VaultRequest", "EditVaultLabelRequest"}) {
+        for (String schema : new String[]{"PostRequest", "PostUpdateRequest", "VoteRequest", "VaultRequest", "EditVaultLabelRequest", "PasswordRecoveryRequest", "PasswordResetRequest", "RefreshTokenRequest"}) {
             assertEquals(checked.path("components").path("schemas").path(schema),
                     generated.path("components").path("schemas").path(schema), "Request contract drift: " + schema);
         }
@@ -52,6 +52,11 @@ class OpenApiContractTest {
         assertEquals(generated.at("/components/schemas/ApiErrorResponse"), checked.at("/components/schemas/ApiErrorResponse"));
         assertEquals(Set.of("content", "page", "size", "total_elements", "total_pages", "sort"),
                 names(generated.at("/components/schemas/PostSearchResponse/properties")));
+        for (String path : new String[]{"/api/v1/auth/password-recovery", "/api/v1/auth/password-reset"}) {
+            assertEquals(generated.path("paths").path(path), checked.path("paths").path(path), "Recovery contract drift: " + path);
+            assertTrue(generated.path("paths").path(path).path("post").path("security").isArray());
+            assertEquals(0, generated.path("paths").path(path).path("post").path("security").size(), "Recovery operations must explicitly document anonymous access");
+        }
 
         var paths = checked.path("paths").fields();
         while (paths.hasNext()) {

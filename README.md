@@ -17,6 +17,7 @@ Arca is a REST API for sharing academic posts and attachments, organized by scho
 ## Features
 
 - **Accounts and profiles** — registration, login, JWT access tokens, persisted refresh sessions, BCrypt passwords, profile editing, avatars, and user search.
+- **Password recovery** — configurable email reset links, hashed single-use tokens, refresh-session revocation and database-backed rate limits; enable after SMTP/frontend setup.
 - **Academic taxonomy** — schools, departments, subjects, aliases, and administrator-managed relationships.
 - **Versioned posts** — approval/rejection queues, revision history, owner/admin edits, and logical-post soft deletion that hides every version while retaining stored data.
 - **Post discovery** — full-text title/content search, combined subject/department/author/date filters, deterministic sorts, and bounded pagination through `/api/v1/posts/search`.
@@ -74,7 +75,7 @@ docker compose -p arca up -d --wait mysql
 ./mvnw spring-boot:run
 ```
 
-Compose starts **only MySQL**, bound to `127.0.0.1:3306`, with a persistent database volume. The application loads `.env` from the repository root and defaults to the `dev` profile. On an empty database, Flyway applies V1–V4 before Hibernate validates the schema.
+Compose starts **only MySQL**, bound to `127.0.0.1:3306`, with a persistent database volume. The application loads `.env` from the repository root and defaults to the `dev` profile. On an empty database, Flyway applies V1–V5 before Hibernate validates the schema.
 
 | Service | Local URL |
 | --- | --- |
@@ -115,6 +116,7 @@ Most `/api/v1` routes require `Authorization: Bearer <access_token>`. Authentica
 | Area | Routes |
 | --- | --- |
 | Authentication | `/api/v1/auth/register`, `/login`, `/refresh`, `/logout` under the auth prefix |
+| Password recovery | `/api/v1/auth/password-recovery`, `/api/v1/auth/password-reset` — anonymous, enabled after provider configuration |
 | Profiles | `/api/v1/user/me`, `/api/v1/user/search`, `/api/v1/user/{userId}/profile-picture` |
 | Posts | `/api/v1/posts`, `/mine`, `/subject/{subjectId}`, `/department/{departmentId}`, `/user/{userId}` under the posts prefix |
 | Search | `/api/v1/posts/search` — combined filters and stable paged results; legacy lists remain arrays |
@@ -131,6 +133,8 @@ Use [openapi.yaml](openapi.yaml) and the running Swagger UI for request/response
 Owners/admins can read active private versions; other authenticated users see approved versions only, including through history, files, votes, and vaults. Missing/deleted/inaccessible posts return 404. Uploads enforce extension/MIME/content agreement, 10 MiB byte limits and 25 million decoded pixels; avatar uploads also support WebP. See [Phase 2 operations](docs/phase-2-operations.md) for the visibility matrix, multipart overhead, storage lifecycle and production configuration.
 
 Search supports `q`, `subject_id`, `department_id`, `author_id`, local `created_at` date bounds `from`/`to`, and sorts `newest`, `oldest`, `relevance`, `vote_score`. Pages start at 0, default size is 20, maximum 100. Default results are approved/latest/non-deleted for all roles; explicit moderation-status filtering is admin-only. See [Phase 3 operations](docs/phase-3-operations.md) for tokenization, date semantics, V4 rollout and observed query plans.
+
+Password recovery defaults disabled (new routes return 503) until reset URL, sender, separate rate-key secret and SMTP are configured. Requests use a generic 202; email links expire after 15 minutes by default. Completion accepts `token` and `new_password`, revokes every refresh session and requires fresh login; existing access JWTs keep normal remaining lifetime. See [Phase 4 operations](docs/phase-4-operations.md) for configuration, proxy/rate policy and delivery/retention behavior.
 
 ## Development
 
@@ -192,7 +196,7 @@ Deletion requests expose a safe `X-Request-ID`, content-free outcome logs, and t
 
 ## Roadmap
 
-[The backend roadmap](docs/arca-backend-roadmap.md) defines additive work on the existing `/api/v1` architecture. Phases 1–3 deliver soft deletion/migrations, shared authorization/media hardening and post search/pagination. Next phases cover password recovery, richer profiles, structured links, admin aggregates, and audit events. Announcements and trending are optional; server-side draft persistence is outside the current backend scope.
+[The backend roadmap](docs/arca-backend-roadmap.md) defines additive work on the existing `/api/v1` architecture. Phases 1–4 deliver soft deletion/migrations, shared authorization/media hardening, post search/pagination and password recovery. Next phases cover richer profiles, structured links, admin aggregates, and audit events. Announcements and trending are optional; server-side draft persistence is outside the current backend scope.
 
 ## Troubleshooting
 

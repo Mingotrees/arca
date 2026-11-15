@@ -25,8 +25,10 @@ public class RefreshTokenService {
     @Autowired
     private UserRepository userRepository;
 
+    @Transactional
     public RefreshToken createRefreshToken(String email) {
-        User user = userRepository.findByEmail(email);
+        User user = userRepository.findByEmailForUpdate(email)
+                .orElseThrow(() -> new org.springframework.security.authentication.BadCredentialsException("Invalid email or password"));
 
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);

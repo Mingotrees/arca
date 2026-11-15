@@ -14,6 +14,112 @@ servers:
 - url: http://localhost:20255
   description: Local development
 paths:
+  /api/v1/auth/password-recovery:
+    post:
+      tags: [password-recovery-controller]
+      summary: Request password recovery
+      description: Anonymous. Always returns the same accepted message for eligible, missing, deleted or banned accounts. A configured email provider receives a single-use reset link after commit; provider errors do not disclose eligibility. Recovery must be configured/enabled before use. Email is normalized for shared per-email and trusted-client-IP limits.
+      operationId: request
+      security: []
+      parameters:
+      - name: X-Request-ID
+        in: header
+        description: Optional safe correlation ID; invalid values are replaced by a UUID
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordRecoveryRequest'
+      responses:
+        "202":
+          description: Generic recovery acknowledgment; no token/account details
+          headers:
+            X-Request-ID:
+              description: Safe request correlation ID
+              style: simple
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        "400":
+          description: Invalid request or invalid/expired reset token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "429":
+          description: Recovery email/client-IP budget exhausted
+          headers:
+            Retry-After:
+              description: Seconds until retry
+              style: simple
+              schema: {type: integer, format: int64}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "503":
+          description: Password recovery not configured/enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/v1/auth/password-reset:
+    post:
+      tags: [password-recovery-controller]
+      summary: Complete password reset
+      description: Anonymous. Submit the 43-character token from the emailed URL fragment and new_password. Password requires 8+ characters, uppercase/lowercase/digit and at most 72 UTF-8 bytes. Token is single-use, expires after configured TTL (default 15 minutes), and newer requests supersede earlier unused tokens. Success revokes all refresh sessions and requires fresh login; existing access JWTs retain their remaining normal lifetime.
+      operationId: reset
+      security: []
+      parameters:
+      - name: X-Request-ID
+        in: header
+        description: Optional safe correlation ID; invalid values are replaced by a UUID
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        "200":
+          description: Password changed; sign in again
+          headers:
+            X-Request-ID:
+              description: Safe request correlation ID
+              style: simple
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        "400":
+          description: Invalid request or invalid/expired reset token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "429":
+          description: Recovery email/client-IP budget exhausted
+          headers:
+            Retry-After:
+              description: Seconds until retry
+              style: simple
+              schema: {type: integer, format: int64}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "503":
+          description: Password recovery not configured/enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
   /api/v1/posts/search:
     get:
       tags: [post-controller]
@@ -1542,6 +1648,31 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    PasswordRecoveryRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          minLength: 0
+          pattern: '^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+    PasswordResetRequest:
+      type: object
+      required: [new_password, token]
+      properties:
+        token:
+          type: string
+          maxLength: 43
+          minLength: 43
+          pattern: '[A-Za-z0-9_-]{43}'
+          writeOnly: true
+        new_password:
+          type: string
+          maxLength: 72
+          minLength: 8
+          writeOnly: true
     ApiErrorResponse:
       type: object
       required: [error, message, status, timestamp]
@@ -1862,7 +1993,7 @@ components:
     RefreshTokenRequest:
       type: object
       properties:
-        refreshToken:
+        refresh_token:
           type: string
     AuthResponse:
       type: object

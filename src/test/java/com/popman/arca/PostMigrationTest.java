@@ -16,7 +16,7 @@ class PostMigrationTest {
         try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
             db.start();
             Flyway flyway = flyway(db);
-            assertEquals(4, flyway.migrate().migrationsExecuted);
+            assertEquals(5, flyway.migrate().migrationsExecuted);
             assertEquals(0, flyway.migrate().migrationsExecuted);
             JdbcTemplate jdbc = jdbc(db);
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM posts", Integer.class));
@@ -49,7 +49,7 @@ class PostMigrationTest {
             assertThrows(Exception.class, () -> flyway(db).migrate());
             Flyway baseline = flyway(db);
             baseline.baseline();
-            assertEquals(3, baseline.migrate().migrationsExecuted);
+            assertEquals(4, baseline.migrate().migrationsExecuted);
             assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM posts WHERE post_id=7 "
                     + "AND is_deleted=false AND deleted_at IS NULL AND deleted_by IS NULL", Integer.class));
             assertEquals(1L, jdbc.queryForObject("SELECT owner_id FROM post_identities WHERE id=7", Long.class));
@@ -80,10 +80,32 @@ class PostMigrationTest {
             jdbc.update("INSERT INTO files(post_id,user_id,file_name) VALUES(10,1,'retained.pdf')");
             jdbc.update("INSERT INTO votes(post_id,user_id,vote_type) VALUES(10,1,'UPVOTE')");
             var before = jdbc.queryForMap("SELECT * FROM posts WHERE id=10");
-            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            Flyway searchMigration = Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("4").load();
+            assertEquals(1, searchMigration.migrate().migrationsExecuted);
             assertEquals(before, jdbc.queryForMap("SELECT * FROM posts WHERE id=10"));
             assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM files WHERE post_id=10", Integer.class));
             assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM votes WHERE post_id=10", Integer.class));
+            assertEquals(0, searchMigration.migrate().migrationsExecuted);
+        }
+    }
+
+    @Test
+    void upgradesV4WithHashOnlyRecoveryTablesWithoutRevokingExistingSessions() {
+        try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
+            db.start();
+            Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("4").load().migrate();
+            JdbcTemplate jdbc = jdbc(db);
+            jdbc.update("INSERT INTO users(id,email,password,is_deleted) VALUES(1,'retained@example.test','retained-bcrypt',false)");
+            jdbc.update("INSERT INTO refresh_tokens(user_id,token,expiry_date) VALUES(1,'retained-session','2027-01-01')");
+            var before = jdbc.queryForMap("SELECT * FROM refresh_tokens");
+            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            assertEquals(before, jdbc.queryForMap("SELECT * FROM refresh_tokens"));
+            assertEquals("retained-bcrypt", jdbc.queryForObject("SELECT password FROM users WHERE id=1", String.class));
+            jdbc.update("INSERT INTO password_reset_tokens(user_id,token_hash,created_at,expires_at) VALUES(1,?,UTC_TIMESTAMP(6),DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 15 MINUTE))", "a".repeat(64));
+            assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> jdbc.update(
+                    "INSERT INTO password_reset_tokens(user_id,token_hash,created_at,expires_at) VALUES(1,?,UTC_TIMESTAMP(6),DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 15 MINUTE))", "a".repeat(64)));
+            jdbc.update("DELETE FROM refresh_tokens"); jdbc.update("DELETE FROM users WHERE id=1");
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM password_reset_tokens", Integer.class));
             assertEquals(0, flyway(db).migrate().migrationsExecuted);
         }
     }

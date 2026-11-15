@@ -18,7 +18,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-/** Runs before security so denied post deletion and search requests are observable too. */
+/** Runs before security so denied post and password-recovery requests are observable too. */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class PostDeletionObservationFilter extends OncePerRequestFilter {
@@ -36,7 +36,9 @@ public class PostDeletionObservationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         boolean deletion = "DELETE".equals(request.getMethod()) && DELETE_PATH.matcher(path).matches();
         boolean search = "GET".equals(request.getMethod()) && "/api/v1/posts/search".equals(path);
-        return !deletion && !search;
+        boolean recovery = "POST".equals(request.getMethod()) &&
+                ("/api/v1/auth/password-recovery".equals(path) || "/api/v1/auth/password-reset".equals(path));
+        return !deletion && !search && !recovery;
     }
 
     @Override
@@ -49,7 +51,13 @@ public class PostDeletionObservationFilter extends OncePerRequestFilter {
         MDC.put("correlation_id", correlation);
         response.setHeader("X-Request-ID", correlation);
         Timer.Sample sample = Timer.start(meters);
-        boolean search = "GET".equals(request.getMethod());
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        String event;
+        String metric;
+        if (path.equals("/api/v1/auth/password-recovery")) { event = "password_recovery"; metric = "arca.auth.password.recovery"; }
+        else if (path.equals("/api/v1/auth/password-reset")) { event = "password_reset"; metric = "arca.auth.password.reset"; }
+        else if ("GET".equals(request.getMethod())) { event = "post_search"; metric = "arca.post.search"; }
+        else { event = "post_delete"; metric = "arca.post.deletion"; }
         boolean failed = false;
         try {
             chain.doFilter(request, response);
@@ -59,12 +67,12 @@ public class PostDeletionObservationFilter extends OncePerRequestFilter {
         } finally {
             int status = failed ? 500 : response.getStatus();
             String outcome = status < 400 ? "success" : status < 500 ? "rejected" : "error";
-            long nanos = sample.stop(Timer.builder(search ? "arca.post.search" : "arca.post.deletion")
-                    .description("Post request outcomes and latency, including authorization failures")
+            long nanos = sample.stop(Timer.builder(metric)
+                    .description("Request outcomes and latency, including authorization failures")
                     .tags("status", Integer.toString(status), "outcome", outcome).register(meters));
             // Never log raw paths, request bodies, headers, or credentials.
-            log.info("post_{} outcome={} status={} correlation_id={} duration_ms={}",
-                    search ? "search" : "delete", outcome, status, correlation, nanos / 1_000_000.0);
+            log.info("{} outcome={} status={} correlation_id={} duration_ms={}",
+                    event, outcome, status, correlation, nanos / 1_000_000.0);
             if (previous == null) MDC.remove("correlation_id");
             else MDC.put("correlation_id", previous);
         }

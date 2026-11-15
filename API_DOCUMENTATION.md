@@ -10961,6 +10961,10 @@ This operation does not require authentication
 |files|[[FileResponse](#schemafileresponse)]|false|none|none|
 |isLatestVersion|boolean|false|none|none|
 |latestVersion|boolean|false|none|none|
+# Phase 4 contract update
+
+Anonymous POST `/api/v1/auth/password-recovery` accepts `email` and returns a generic 202 when configured. POST `/api/v1/auth/password-reset` accepts `token` and `new_password`, consumes an expiring one-use token, updates BCrypt password and revokes refresh sessions. New routes return 503 until enabled/configured, 429 with Retry-After for abuse limits, and standard JSON errors. Reset tokens are delivered only by email as frontend URL fragments, never in API responses. Existing access JWTs retain normal lifetime. See [Phase 4 operations](docs/phase-4-operations.md) and [openapi.yaml](openapi.yaml) for full configuration and contracts. Legacy refresh/logout requests use the existing snake_case `refresh_token` wire field.
+
 # Phase 3 contract update
 
 `GET /api/v1/posts/search` adds full-text discovery and a page envelope (`content`, `page`, `size`, `total_elements`, `total_pages`, `sort`). Legacy list routes remain arrays. Query parameters, admin-only moderation-status filtering, timestamp/tokenization semantics, index rollout and observed plans are documented in [Phase 3 operations](docs/phase-3-operations.md) and [openapi.yaml](openapi.yaml). This new endpoint requires the existing bearer JWT.

@@ -59,7 +59,8 @@ public class SecurityConfig {
         .csrf(csrf -> csrf.disable())
         .authorizeHttpRequests(auth -> auth
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-            .requestMatchers("/api/v1/auth/**").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
+                    "/api/v1/auth/logout", "/api/v1/auth/password-recovery", "/api/v1/auth/password-reset").permitAll()
             .requestMatchers("/actuator/**").hasAuthority("ROLE_ADMIN")
             .requestMatchers(HttpMethod.GET, "/api/v1/user/*/profile-picture").permitAll()
             .requestMatchers("/api/v1/admin/**").hasAuthority("ROLE_ADMIN")
@@ -117,7 +118,7 @@ public class SecurityConfig {
         .setAllowedHeaders(defaultIfEmpty(allowedHeaders, List.of("Authorization", "Content-Type", "Cache-Control", "X-Request-ID")));
     configuration.setAllowCredentials(true);
     configuration.validateAllowCredentials();
-    configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition", "X-Request-ID"));
+    configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition", "X-Request-ID", "Retry-After"));
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", configuration);
