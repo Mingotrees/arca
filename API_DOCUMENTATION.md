@@ -10961,6 +10961,10 @@ This operation does not require authentication
 |files|[[FileResponse](#schemafileresponse)]|false|none|none|
 |isLatestVersion|boolean|false|none|none|
 |latestVersion|boolean|false|none|none|
+# Phase 3 contract update
+
+`GET /api/v1/posts/search` adds full-text discovery and a page envelope (`content`, `page`, `size`, `total_elements`, `total_pages`, `sort`). Legacy list routes remain arrays. Query parameters, admin-only moderation-status filtering, timestamp/tokenization semantics, index rollout and observed plans are documented in [Phase 3 operations](docs/phase-3-operations.md) and [openapi.yaml](openapi.yaml). This new endpoint requires the existing bearer JWT.
+
 # Phase 2 contract update
 
 The current resource-visibility, upload-limit, error-envelope and storage rules are documented in [Phase 2 operations](docs/phase-2-operations.md) and [openapi.yaml](openapi.yaml). Private/pending/rejected/superseded versions are owner/admin-only across posts, files, history, votes and vaults; inaccessible parents return 404. Legacy `user_id` ownership inputs are ignored. Uploads validate content as well as extension/MIME, enforce 10 MiB byte and 25-million-pixel limits, and return 400/413/415 for invalid content. Successful routes and payloads remain compatible. Examples below may predate these tightened rules.

@@ -15,6 +15,16 @@ import java.time.LocalDateTime;
 
 @Repository
 public interface PostRepository extends JpaRepository<Post, Long> {
+    // Include existing eager roles/subject departments to avoid secondary per-author/subject queries.
+    // Files are fetched separately so two bag collections never share a fetch join.
+    @Query("SELECT DISTINCT p FROM Post p LEFT JOIN FETCH p.user author LEFT JOIN FETCH author.roles " +
+            "LEFT JOIN FETCH p.department LEFT JOIN FETCH p.subjects subject " +
+            "LEFT JOIN FETCH subject.listDepartments WHERE p.id IN :ids")
+    List<Post> findSearchPageDetails(@Param("ids") List<Long> ids);
+
+    @Query("SELECT DISTINCT p FROM Post p LEFT JOIN FETCH p.files WHERE p.id IN :ids")
+    List<Post> fetchSearchPageFiles(@Param("ids") List<Long> ids);
+
     // All writers for an existing logical post must acquire this lock FIRST.
     // The identity row remains a stable lock anchor even after soft deletion.
     @Query(value = "SELECT identity_row.id FROM post_identities identity_row WHERE identity_row.id = " +

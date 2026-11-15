@@ -14,6 +14,95 @@ servers:
 - url: http://localhost:20255
   description: Local development
 paths:
+  /api/v1/posts/search:
+    get:
+      tags: [post-controller]
+      summary: Search and page posts
+      description: Filters intersect. Default results are APPROVED, latest and non-deleted for every role. q uses MySQL natural-language full-text over title/content; blank q is absent. Default sort is relevance with q, newest otherwise. from is inclusive and to exclusive on stored created_at (ISO local date-times, no timezone conversion). Explicit status requires admin; non-approved status searches use newest stored revision per logical post, including rejected revisions.
+      operationId: searchPosts
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: X-Request-ID
+        in: header
+        description: "Optional correlation ID: 1-64 letters, digits, dots, underscores or hyphens; invalid values are replaced by a UUID"
+        schema: {type: string}
+      - name: q
+        in: query
+        description: Natural-language title/content query; maximum 200 characters
+        required: false
+        schema: {type: string, maxLength: 200}
+      - name: subject_id
+        in: query
+        required: false
+        schema: {type: integer, format: int64, minimum: 1}
+      - name: department_id
+        in: query
+        required: false
+        schema: {type: integer, format: int64, minimum: 1}
+      - name: author_id
+        in: query
+        required: false
+        schema: {type: integer, format: int64, minimum: 1}
+      - name: from
+        in: query
+        description: Inclusive created_at lower bound, no offset
+        required: false
+        schema: {type: string}
+        example: '2026-01-01T00:00:00'
+      - name: to
+        in: query
+        description: Exclusive created_at upper bound, no offset
+        required: false
+        schema: {type: string}
+        example: '2026-02-01T00:00:00'
+      - name: page
+        in: query
+        required: false
+        schema: {type: integer, format: int32, minimum: 0, default: 0}
+      - name: size
+        in: query
+        required: false
+        schema: {type: integer, format: int32, minimum: 1, maximum: 100, default: 20}
+      - name: sort
+        in: query
+        required: false
+        schema: {type: string, enum: [newest, oldest, relevance, vote_score]}
+      - name: status
+        in: query
+        description: Admin only
+        required: false
+        schema: {type: string, enum: [APPROVED, PENDING_APPROVAL, REJECTED, SUPERSEDED]}
+      responses:
+        "200":
+          description: Bounded page of existing PostResponse objects
+          headers:
+            X-Request-ID:
+              description: Safe request correlation ID
+              style: simple
+              schema: {type: string}
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PostSearchResponse'
+        "400":
+          description: Invalid filter, date range, page, size or sort
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "403":
+          description: Explicit status filter requires admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
   /api/v1/vaults/edit-label:
     put:
       tags:
@@ -1453,6 +1542,26 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    ApiErrorResponse:
+      type: object
+      required: [error, message, status, timestamp]
+      properties:
+        timestamp: {type: string}
+        status: {type: integer, format: int32}
+        error: {type: string}
+        message: {type: string}
+    PostSearchResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostResponse'
+        page: {type: integer, format: int32}
+        size: {type: integer, format: int32}
+        sort: {type: string}
+        total_elements: {type: integer, format: int64}
+        total_pages: {type: integer, format: int64}
     EditVaultLabelRequest:
       type: object
       properties:

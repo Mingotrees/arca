@@ -19,6 +19,10 @@ import com.popman.arca.repository.SubjectRepository;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.PostService;
 import com.popman.arca.service.PostAccessPolicy;
+import com.popman.arca.dto.v1.post.PostSearchCriteria;
+import com.popman.arca.dto.v1.post.PostSearchResponse;
+import com.popman.arca.repository.PostSearchRepository;
+import com.popman.arca.repository.VoteRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -38,6 +42,39 @@ import java.util.stream.Collectors;
 public class PostServiceImplementation implements PostService {
 
     private final PostAccessPolicy accessPolicy = new PostAccessPolicy();
+
+    @Autowired
+    private PostSearchRepository searchRepository;
+
+    @Autowired
+    private VoteRepository voteRepository;
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true,
+            isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public PostSearchResponse searchPostsV1(PostSearchCriteria criteria, boolean isAdmin) {
+        if (criteria.status() != null && !isAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Status filtering requires admin access");
+        }
+        var result = searchRepository.search(criteria);
+        List<PostResponse> content = List.of();
+        if (!result.ids().isEmpty()) {
+            var postsById = postRepository.findSearchPageDetails(result.ids()).stream()
+                    .collect(Collectors.toMap(Post::getId, post -> post));
+            postRepository.fetchSearchPageFiles(result.ids());
+            var votes = voteRepository.countSearchPageVotes(result.ids()).stream()
+                    .collect(Collectors.toMap(VoteRepository.PostVoteCounts::getPostId, counts -> counts));
+            content = result.ids().stream().map(id -> {
+                Post post = postsById.get(id);
+                accessPolicy.requireReadable(post);
+                var counts = votes.get(id);
+                return mapToResponse(post, counts == null ? 0 : Math.toIntExact(counts.getUpvotes()),
+                        counts == null ? 0 : Math.toIntExact(counts.getDownvotes()));
+            }).toList();
+        }
+        long pages = result.total() / criteria.size() + (result.total() % criteria.size() == 0 ? 0 : 1);
+        return new PostSearchResponse(content, criteria.page(), criteria.size(), result.total(), pages, criteria.sort());
+    }
 
     @Autowired
     private PostRepository postRepository;
@@ -303,6 +340,20 @@ public class PostServiceImplementation implements PostService {
 
 
     private PostResponse mapToResponse(Post post) {
+        int upvotes = 0;
+        int downvotes = 0;
+        try {
+            upvotes = voteServiceImplementation.getUpvoteCountV1(post.getId());
+            downvotes = voteServiceImplementation.getDownvoteCountV1(post.getId());
+        } catch (Exception e) {
+            // Preserve legacy list mapping behavior; search supplies explicit batched counts instead.
+            upvotes = 0;
+            downvotes = 0;
+        }
+        return mapToResponse(post, upvotes, downvotes);
+    }
+
+    private PostResponse mapToResponse(Post post, int upvotes, int downvotes) {
         PostResponse response = new PostResponse();
         response.setId(post.getId());
         response.setPostId(post.getPost_id());
@@ -342,16 +393,8 @@ public class PostServiceImplementation implements PostService {
             response.setRejectionReason(post.getRejectionReason());
         }
 
-        try {
-            Integer upvotes = voteServiceImplementation.getUpvoteCountV1(post.getId());
-            Integer downvotes = voteServiceImplementation.getDownvoteCountV1(post.getId());
-
-            response.setUpvoteCount(upvotes);
-            response.setDownvoteCount(downvotes);
-        } catch (Exception e) {
-            response.setUpvoteCount(0);
-            response.setDownvoteCount(0);
-        }
+        response.setUpvoteCount(upvotes);
+        response.setDownvoteCount(downvotes);
 
         if (post.getFiles() != null && !post.getFiles().isEmpty()) {
                 List<FileResponse> fileResponses = post.getFiles().stream()
