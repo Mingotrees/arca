@@ -8,10 +8,10 @@ import com.popman.arca.dto.v1.common.MessageResponse;
 import com.popman.arca.dto.v1.refreshtoken.RefreshTokenRequest;
 import com.popman.arca.entity.RefreshToken;
 import com.popman.arca.entity.User;
-import com.popman.arca.service.JWTService;
 import com.popman.arca.service.BannedEmailService;
 import com.popman.arca.service.RefreshTokenService;
 import com.popman.arca.service.UserService;
+import com.popman.arca.service.AuthSessionService;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -19,10 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -32,21 +29,17 @@ public class AuthController {
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
     private final UserService userService;
-    private final JWTService jwtService;
     private final RefreshTokenService refreshTokenService;
-    private final AuthenticationManager authenticationManager;
     private final BannedEmailService bannedEmailService;
+    private final AuthSessionService sessions;
 
     public AuthController(UserService userService,
-                          JWTService jwtService,
                           RefreshTokenService refreshTokenService,
-                          AuthenticationManager authenticationManager,
-                          BannedEmailService bannedEmailService) {
+                          BannedEmailService bannedEmailService, AuthSessionService sessions) {
         this.userService = userService;
-        this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
-        this.authenticationManager = authenticationManager;
         this.bannedEmailService = bannedEmailService;
+        this.sessions = sessions;
     }
 
     @PostMapping("/register")
@@ -78,43 +71,15 @@ public class AuthController {
             content = @Content(schema = @Schema(implementation = AuthResponse.class)))
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         try {
-            if (bannedEmailService.isBannedV1(loginRequest.getEmail())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new ErrorResponse("Login blocked: email is banned"));
-            }
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            loginRequest.getEmail(),
-                            loginRequest.getPassword()
-                    )
-            );
-
-            if (authentication.isAuthenticated()) {
-                // Generate access token
-                String accessToken = jwtService.generateToken(loginRequest.getEmail());
-
-                // Generate refresh token
-                RefreshToken refreshToken = refreshTokenService.createRefreshToken(loginRequest.getEmail());
-
-
-                // Return both tokens
-                AuthResponse response = new AuthResponse(
-                        accessToken,
-                        refreshToken.getToken(),
-                        loginRequest.getEmail()
-                );
-
-                return ResponseEntity.ok(response);
-            } else {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(new ErrorResponse("Authentication failed"));
-            }
+            return ResponseEntity.ok(sessions.login(loginRequest.getEmail(), loginRequest.getPassword()));
+        } catch (AuthSessionService.BannedAccountException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(e.getMessage()));
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new ErrorResponse("Invalid email or password"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ErrorResponse("Login failed: " + e.getMessage()));
+                    .body(new ErrorResponse("Login failed"));
         }
     }
 
@@ -123,32 +88,13 @@ public class AuthController {
             content = @Content(schema = @Schema(implementation = AuthResponse.class)))
     public ResponseEntity<?> refreshToken(@RequestBody RefreshTokenRequest request) {
         try {
-            RefreshToken refreshToken = refreshTokenService.findByToken(request.getRefreshToken())
-                    .orElseThrow(() -> new RuntimeException("Invalid refresh token"));
-
-            refreshTokenService.verifyExpiration(refreshToken);
-
-            User user = refreshToken.getUser();
-            if (bannedEmailService.isBannedV1(user.getEmail())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new ErrorResponse("Refresh blocked: email is banned"));
-            }
-            String newAccessToken = jwtService.generateToken(user.getEmail());
-
-            logger.info("Token refreshed for user: {}", user.getEmail());
-
-            AuthResponse response = new AuthResponse(
-                    newAccessToken,
-                    request.getRefreshToken(),
-                    user.getEmail()
-            );
-
-            return ResponseEntity.ok(response);
-
+            return ResponseEntity.ok(sessions.refresh(request.getRefreshToken()));
+        } catch (AuthSessionService.BannedAccountException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(e.getMessage()));
         } catch (RuntimeException e) {
-            logger.error("Error refreshing token: {}", e.getMessage());
+            logger.warn("auth_refresh outcome=rejected");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ErrorResponse(e.getMessage()));
+                    .body(new ErrorResponse(e instanceof AuthSessionService.InvalidRefreshTokenException ? e.getMessage() : "Invalid refresh token"));
         }
     }
 

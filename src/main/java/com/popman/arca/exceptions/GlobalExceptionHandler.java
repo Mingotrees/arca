@@ -22,6 +22,13 @@ import java.util.NoSuchElementException;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(RecoveryRateLimitException.class)
+    public ResponseEntity<Object> handleRecoveryRateLimit(RecoveryRateLimitException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).header("Retry-After", Long.toString(ex.retryAfter()))
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(ApiErrors.body(429, "too_many_requests", ex.getMessage()));
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Object> handleResponseStatusException(ResponseStatusException ex) {
         String message = ex.getReason() == null ? ex.getMessage() : ex.getReason();
