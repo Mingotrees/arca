@@ -1,12 +1,15 @@
 package com.popman.arca.controller.v1;
 
 import com.popman.arca.dto.v1.common.MessageResponse;
+import com.popman.arca.dto.v1.common.ApiErrorResponse;
 import com.popman.arca.dto.v1.post.PostApprovalRequest;
 import com.popman.arca.dto.v1.post.PostRequest;
 import com.popman.arca.dto.v1.post.PostCreateResponse;
 import com.popman.arca.dto.v1.post.PostResponse;
 import com.popman.arca.dto.v1.post.PostUpdateRequest;
 import com.popman.arca.dto.v1.post.PostUpdateResponse;
+import com.popman.arca.dto.v1.post.PostSearchCriteria;
+import com.popman.arca.dto.v1.post.PostSearchResponse;
 import com.popman.arca.entity.UserPrincipal;
 import com.popman.arca.service.PostService;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -42,6 +45,43 @@ public class PostController {
     @GetMapping
     public ResponseEntity<List<PostResponse>> getAllPosts() {
         return ResponseEntity.ok(postService.getAllPostsV1());
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Search and page posts", description = "Filters intersect. Default results are APPROVED, latest and non-deleted for every role. "
+            + "q uses MySQL natural-language full-text over title/content; blank q is absent. Default sort is relevance with q, newest otherwise. "
+            + "from is inclusive and to exclusive on stored created_at (ISO local date-times, no timezone conversion). "
+            + "Explicit status requires admin; non-approved status searches use newest stored revision per logical post, including rejected revisions.",
+            security = @SecurityRequirement(name = "bearerAuth"),
+            parameters = @Parameter(name = "X-Request-ID", in = ParameterIn.HEADER,
+                    description = "Optional correlation ID: 1-64 letters, digits, dots, underscores or hyphens; invalid values are replaced by a UUID",
+                    schema = @Schema(type = "string")))
+    @ApiResponse(responseCode = "200", description = "Bounded page of existing PostResponse objects",
+            content = @Content(schema = @Schema(implementation = PostSearchResponse.class)),
+            headers = @Header(name = "X-Request-ID", description = "Safe request correlation ID", schema = @Schema(type = "string")))
+    @ApiResponse(responseCode = "400", description = "Invalid filter, date range, page, size or sort",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "401", description = "Authentication required",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "403", description = "Explicit status filter requires admin",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
+    public ResponseEntity<PostSearchResponse> searchPosts(
+            @Parameter(description = "Natural-language title/content query; maximum 200 characters", schema = @Schema(maxLength = 200))
+            @RequestParam(required = false) String q,
+            @Parameter(schema = @Schema(type = "integer", format = "int64", minimum = "1")) @RequestParam(name = "subject_id", required = false) Long subjectId,
+            @Parameter(schema = @Schema(type = "integer", format = "int64", minimum = "1")) @RequestParam(name = "department_id", required = false) Long departmentId,
+            @Parameter(schema = @Schema(type = "integer", format = "int64", minimum = "1")) @RequestParam(name = "author_id", required = false) Long authorId,
+            @Parameter(description = "Inclusive created_at lower bound, no offset", example = "2026-01-01T00:00:00") @RequestParam(required = false) String from,
+            @Parameter(description = "Exclusive created_at upper bound, no offset", example = "2026-02-01T00:00:00") @RequestParam(required = false) String to,
+            @Parameter(schema = @Schema(type = "integer", format = "int32", minimum = "0", defaultValue = "0")) @RequestParam(defaultValue = "0") int page,
+            @Parameter(schema = @Schema(type = "integer", format = "int32", minimum = "1", maximum = "100", defaultValue = "20")) @RequestParam(defaultValue = "20") int size,
+            @Parameter(schema = @Schema(allowableValues = {"newest", "oldest", "relevance", "vote_score"})) @RequestParam(required = false) String sort,
+            @Parameter(description = "Admin only", schema = @Schema(allowableValues = {"APPROVED", "PENDING_APPROVAL", "REJECTED", "SUPERSEDED"}))
+            @RequestParam(required = false) String status,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        var criteria = new PostSearchCriteria(q, subjectId, departmentId, authorId,
+                PostSearchCriteria.parseDate(from), PostSearchCriteria.parseDate(to), page, size, sort, status);
+        return ResponseEntity.ok(postService.searchPostsV1(criteria, principal.isAdmin()));
     }
 
     @GetMapping("/subject/{subjectId}")

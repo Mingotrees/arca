@@ -46,6 +46,12 @@ class OpenApiContractTest {
             assertEquals(checked.path("components").path("schemas").path(schema),
                     generated.path("components").path("schemas").path(schema), "Request contract drift: " + schema);
         }
+        assertEquals(generated.path("paths").path("/api/v1/posts/search"), checked.path("paths").path("/api/v1/posts/search"),
+                "Search operation must match the generated contract");
+        assertEquals(generated.at("/components/schemas/PostSearchResponse"), checked.at("/components/schemas/PostSearchResponse"));
+        assertEquals(generated.at("/components/schemas/ApiErrorResponse"), checked.at("/components/schemas/ApiErrorResponse"));
+        assertEquals(Set.of("content", "page", "size", "total_elements", "total_pages", "sort"),
+                names(generated.at("/components/schemas/PostSearchResponse/properties")));
 
         var paths = checked.path("paths").fields();
         while (paths.hasNext()) {

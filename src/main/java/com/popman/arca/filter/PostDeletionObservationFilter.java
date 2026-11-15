@@ -18,7 +18,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-/** Runs before security so denied DELETE requests are observable too. */
+/** Runs before security so denied post deletion and search requests are observable too. */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class PostDeletionObservationFilter extends OncePerRequestFilter {
@@ -34,7 +34,9 @@ public class PostDeletionObservationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        return !"DELETE".equals(request.getMethod()) || !DELETE_PATH.matcher(path).matches();
+        boolean deletion = "DELETE".equals(request.getMethod()) && DELETE_PATH.matcher(path).matches();
+        boolean search = "GET".equals(request.getMethod()) && "/api/v1/posts/search".equals(path);
+        return !deletion && !search;
     }
 
     @Override
@@ -47,6 +49,7 @@ public class PostDeletionObservationFilter extends OncePerRequestFilter {
         MDC.put("correlation_id", correlation);
         response.setHeader("X-Request-ID", correlation);
         Timer.Sample sample = Timer.start(meters);
+        boolean search = "GET".equals(request.getMethod());
         boolean failed = false;
         try {
             chain.doFilter(request, response);
@@ -56,12 +59,12 @@ public class PostDeletionObservationFilter extends OncePerRequestFilter {
         } finally {
             int status = failed ? 500 : response.getStatus();
             String outcome = status < 400 ? "success" : status < 500 ? "rejected" : "error";
-            long nanos = sample.stop(Timer.builder("arca.post.deletion")
-                    .description("Post deletion request outcomes and latency, including authorization failures")
+            long nanos = sample.stop(Timer.builder(search ? "arca.post.search" : "arca.post.deletion")
+                    .description("Post request outcomes and latency, including authorization failures")
                     .tags("status", Integer.toString(status), "outcome", outcome).register(meters));
             // Never log raw paths, request bodies, headers, or credentials.
-            log.info("post_delete outcome={} status={} correlation_id={} duration_ms={}",
-                    outcome, status, correlation, nanos / 1_000_000.0);
+            log.info("post_{} outcome={} status={} correlation_id={} duration_ms={}",
+                    search ? "search" : "delete", outcome, status, correlation, nanos / 1_000_000.0);
             if (previous == null) MDC.remove("correlation_id");
             else MDC.put("correlation_id", previous);
         }

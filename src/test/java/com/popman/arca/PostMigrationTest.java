@@ -16,13 +16,17 @@ class PostMigrationTest {
         try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
             db.start();
             Flyway flyway = flyway(db);
-            assertEquals(3, flyway.migrate().migrationsExecuted);
+            assertEquals(4, flyway.migrate().migrationsExecuted);
             assertEquals(0, flyway.migrate().migrationsExecuted);
             JdbcTemplate jdbc = jdbc(db);
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM posts", Integer.class));
             assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.columns "
                     + "WHERE table_schema = DATABASE() AND table_name = 'posts' "
                     + "AND column_name IN ('is_deleted','deleted_at','deleted_by')", Integer.class));
+            assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() "
+                    + "AND table_name='posts' AND index_name='ft_posts_title_content' AND index_type='FULLTEXT'", Integer.class));
+            assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() "
+                    + "AND table_name='posts' AND column_name IN ('title','content') AND collation_name='utf8mb4_0900_ai_ci'", Integer.class));
         }
     }
 
@@ -45,10 +49,12 @@ class PostMigrationTest {
             assertThrows(Exception.class, () -> flyway(db).migrate());
             Flyway baseline = flyway(db);
             baseline.baseline();
-            assertEquals(2, baseline.migrate().migrationsExecuted);
+            assertEquals(3, baseline.migrate().migrationsExecuted);
             assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM posts WHERE post_id=7 "
                     + "AND is_deleted=false AND deleted_at IS NULL AND deleted_by IS NULL", Integer.class));
             assertEquals(1L, jdbc.queryForObject("SELECT owner_id FROM post_identities WHERE id=7", Long.class));
+            assertEquals("Old", jdbc.queryForObject("SELECT title FROM posts WHERE post_id=7 AND version=1", String.class));
+            assertEquals("Body", jdbc.queryForObject("SELECT content FROM posts WHERE post_id=7 AND version=2", String.class));
             assertEquals(0, baseline.migrate().migrationsExecuted);
         }
     }
@@ -56,6 +62,30 @@ class PostMigrationTest {
     private Flyway flyway(MySQLContainer<?> db) {
         return Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword())
                 .baselineVersion("1").baselineOnMigrate(false).load();
+    }
+
+    @Test
+    void addsSearchIndexesToV3WithoutChangingUnicodeRowsOrDeletionProvenance() {
+        try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
+            db.start();
+            Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("3").load().migrate();
+            JdbcTemplate jdbc = jdbc(db);
+            jdbc.update("INSERT INTO users(id,email) VALUES(1,'retained@example.test')");
+            jdbc.update("INSERT INTO school(id,name) VALUES(1,'School')");
+            jdbc.update("INSERT INTO departments(id,name,school_id) VALUES(1,'Department',1)");
+            jdbc.update("INSERT INTO post_identities(id,owner_id) VALUES(7,1)");
+            jdbc.update("INSERT INTO posts(id,post_id,version,title,content,status,user_id,department_id,is_latest_version,"
+                    + "is_deleted,deleted_at,deleted_by,created_at,updated_at) VALUES "
+                    + "(10,7,1,'Résumé','café electron αβγ','APPROVED',1,1,true,true,'2026-01-02',1,'2026-01-01','2026-01-01')");
+            jdbc.update("INSERT INTO files(post_id,user_id,file_name) VALUES(10,1,'retained.pdf')");
+            jdbc.update("INSERT INTO votes(post_id,user_id,vote_type) VALUES(10,1,'UPVOTE')");
+            var before = jdbc.queryForMap("SELECT * FROM posts WHERE id=10");
+            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            assertEquals(before, jdbc.queryForMap("SELECT * FROM posts WHERE id=10"));
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM files WHERE post_id=10", Integer.class));
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM votes WHERE post_id=10", Integer.class));
+            assertEquals(0, flyway(db).migrate().migrationsExecuted);
+        }
     }
 
     @ParameterizedTest
