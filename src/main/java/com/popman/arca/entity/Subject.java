@@ -27,6 +27,38 @@ public class Subject {
     @Column
     private String name;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private java.time.LocalDateTime createdAt;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "updated_at", nullable = false)
+    private java.time.LocalDateTime updatedAt;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "timestamps_approximate", nullable = false, updatable = false)
+    private boolean timestampsApproximate;
+
+    public java.time.LocalDateTime getCreatedAt() { return createdAt; }
+    public java.time.LocalDateTime getUpdatedAt() { return updatedAt; }
+    public boolean isTimestampsApproximate() { return timestampsApproximate; }
+
+    public void touchUpdatedAt() {
+        if (updatedAt == null) return;
+        var now = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plusNanos(1000);
+    }
+
+    @PrePersist
+    private void initializeProfileTimestamps() {
+        createdAt = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        updatedAt = createdAt;
+        timestampsApproximate = false;
+    }
+
+    @PreUpdate
+    private void updateProfileTimestamp() { touchUpdatedAt(); }
+
     @ElementCollection
     @CollectionTable(
             name = "subject_aliases",
@@ -86,6 +118,7 @@ public class Subject {
     }
 
     public void setAliases(List<String> aliases) {
+        if (!java.util.Objects.equals(this.aliases, aliases)) touchUpdatedAt();
         this.aliases = aliases;
     }
 
@@ -94,11 +127,13 @@ public class Subject {
     }
 
     public void setListDepartments(List<Department> listDepartments) {
+        if (!java.util.Objects.equals(this.listDepartments, listDepartments)) touchUpdatedAt();
         this.listDepartments = listDepartments;
     }
 
     public void addDepartment(Department department) {
         if (!listDepartments.contains(department)) {
+            touchUpdatedAt();
             listDepartments.add(department);
             department.getSubjects().add(this);
         }
@@ -106,6 +141,7 @@ public class Subject {
 
     public void removeDepartment(Department department) {
         if (listDepartments.contains(department)) {
+            touchUpdatedAt();
             listDepartments.remove(department);
             department.getSubjects().remove(this);
         }

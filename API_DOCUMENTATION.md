@@ -10961,6 +10961,10 @@ This operation does not require authentication
 |files|[[FileResponse](#schemafileresponse)]|false|none|none|
 |isLatestVersion|boolean|false|none|none|
 |latestVersion|boolean|false|none|none|
+# Phase 5 contract update
+
+Authenticated GET `/api/v1/user/{userId}/stats` returns `approved_post_count`, `upvotes_received`, `downvotes_received`; GET `/api/v1/subject/{subjectId}/stats` returns `approved_post_count`, `last_approved_post_at` (null for no eligible posts). Counts use approved/latest/non-deleted version rows and deduplicate logical post IDs. User/subject responses add optional UTC created_at/updated_at fields; legacy creation times are deployment-time approximations recorded internally. Existing response fields and JWT access rules remain. See [Phase 5 operations](docs/phase-5-operations.md) and [openapi.yaml](openapi.yaml) for clock/provenance, retained deletion semantics, indexed query evidence and V6 rollout.
+
 # Phase 4 contract update
 
 Anonymous POST `/api/v1/auth/password-recovery` accepts `email` and returns a generic 202 when configured. POST `/api/v1/auth/password-reset` accepts `token` and `new_password`, consumes an expiring one-use token, updates BCrypt password and revokes refresh sessions. New routes return 503 until enabled/configured, 429 with Retry-After for abuse limits, and standard JSON errors. Reset tokens are delivered only by email as frontend URL fragments, never in API responses. Existing access JWTs retain normal lifetime. See [Phase 4 operations](docs/phase-4-operations.md) and [openapi.yaml](openapi.yaml) for full configuration and contracts. Legacy refresh/logout requests use the existing snake_case `refresh_token` wire field.

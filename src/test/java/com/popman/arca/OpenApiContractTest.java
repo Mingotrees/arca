@@ -57,6 +57,14 @@ class OpenApiContractTest {
             assertTrue(generated.path("paths").path(path).path("post").path("security").isArray());
             assertEquals(0, generated.path("paths").path(path).path("post").path("security").size(), "Recovery operations must explicitly document anonymous access");
         }
+        for (String path : new String[]{"/api/v1/user/{userId}/stats", "/api/v1/subject/{subjectId}/stats"}) {
+            assertEquals(generated.path("paths").path(path), checked.path("paths").path(path), "Statistics contract drift: " + path);
+        }
+        for (String schema : new String[]{"UserResponse", "UserSummaryResponse", "SubjectResponse", "SubjectRequest", "UserStatsResponse", "SubjectStatsResponse"}) {
+            assertEquals(generated.path("components").path("schemas").path(schema), checked.path("components").path("schemas").path(schema), "Profile schema drift: " + schema);
+        }
+        assertFalse(generated.at("/components/schemas/User/properties").has("timestamps_approximate"));
+        assertFalse(generated.at("/components/schemas/User/properties").has("timestampsApproximate"));
 
         var paths = checked.path("paths").fields();
         while (paths.hasNext()) {

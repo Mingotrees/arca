@@ -12,6 +12,22 @@ public class SubjectResponse {
     private List<String> aliases;
     private List<DepartmentResponse> departments;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("created_at")
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    @io.swagger.v3.oas.annotations.media.Schema(accessMode = io.swagger.v3.oas.annotations.media.Schema.AccessMode.READ_ONLY,
+            description = "UTC creation time; deployment-time approximation for legacy subjects")
+    private java.time.Instant createdAt;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("updated_at")
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    @io.swagger.v3.oas.annotations.media.Schema(accessMode = io.swagger.v3.oas.annotations.media.Schema.AccessMode.READ_ONLY, description = "UTC last modification time")
+    private java.time.Instant updatedAt;
+
+    public java.time.Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(java.time.Instant createdAt) { this.createdAt = createdAt; }
+    public java.time.Instant getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(java.time.Instant updatedAt) { this.updatedAt = updatedAt; }
+
 
     public Long getId() {
         return id;
