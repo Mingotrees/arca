@@ -528,3 +528,11 @@ Defaults above permit engineering estimates, but these decisions should be resol
 ## 10. Roadmap completion outcome
 
 When all required phases are complete, Arca will retain its current Spring MVC/JPA/JWT architecture and `/api/v1` compatibility while adding safe post deletion, consistent resource security, scalable post discovery, account recovery, richer profile data/media, structured links, operational aggregates, and auditability. Announcements and trending remain explicitly optional, and drafts remain a deliberate frontend-only capability until product requirements justify server persistence.
+
+### Final handoff reminder — requested by user
+
+At the final roadmap handoff, explicitly remind the user:
+
+> Add V5 token/rate tables. Recovery stays disabled until SMTP, frontend URL and a separate rate-key secret are configured.
+
+V5 migration is already implemented; the remaining deployment action is to apply it through the reviewed rollout procedure and configure/enable recovery. Refer to [Phase 4 operations](phase-4-operations.md). Do not treat committed backend code as confirmation that production recovery is enabled.

@@ -14,6 +14,112 @@ servers:
 - url: http://localhost:20255
   description: Local development
 paths:
+  /api/v1/user/{userId}/stats:
+    get:
+      tags: [profile-statistics-controller]
+      summary: Read user profile statistics
+      description: "Same public aggregate set for all authenticated roles: approved/latest/non-deleted version rows. Post count deduplicates logical post_id; votes are counted on eligible version row IDs, including retained votes by deleted voters. Deleted user profiles return 404."
+      operationId: userStats
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: X-Request-ID
+        in: header
+        description: Optional safe correlation ID; invalid values are replaced by a UUID
+        schema: {type: string}
+      - name: userId
+        in: path
+        required: true
+        schema: {type: integer, format: int64, minimum: 1}
+      responses:
+        "200":
+          description: User aggregate statistics
+          headers:
+            X-Request-ID:
+              description: Safe request correlation ID
+              style: simple
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserStatsResponse'
+        "400":
+          description: Invalid profile ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "403":
+          description: Profile access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "404":
+          description: Profile missing or user deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/v1/subject/{subjectId}/stats:
+    get:
+      tags: [profile-statistics-controller]
+      summary: Read subject profile statistics
+      description: Counts distinct logical post_id among linked approved/latest/non-deleted rows. last_approved_post_at is MAX of eligible Post.updated_at, using its existing stored clock; null when empty. Active posts by deleted authors remain counted, consistent with existing post visibility. Owners/admins receive no private moderation counts.
+      operationId: subjectStats
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: X-Request-ID
+        in: header
+        description: Optional safe correlation ID; invalid values are replaced by a UUID
+        schema: {type: string}
+      - name: subjectId
+        in: path
+        required: true
+        schema: {type: integer, format: int64, minimum: 1}
+      responses:
+        "200":
+          description: Subject aggregate statistics
+          headers:
+            X-Request-ID:
+              description: Safe request correlation ID
+              style: simple
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubjectStatsResponse'
+        "400":
+          description: Invalid profile ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "403":
+          description: Profile access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "404":
+          description: Profile missing or user deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
   /api/v1/auth/password-recovery:
     post:
       tags: [password-recovery-controller]
@@ -1648,6 +1754,36 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    UserStatsResponse:
+      type: object
+      properties:
+        approved_post_count:
+          type: integer
+          format: int64
+          description: Distinct logical posts with approved/latest/non-deleted version rows
+          minimum: 0
+        upvotes_received:
+          type: integer
+          format: int64
+          description: Stored upvotes on eligible version rows
+          minimum: 0
+        downvotes_received:
+          type: integer
+          format: int64
+          description: Stored downvotes on eligible version rows
+          minimum: 0
+    SubjectStatsResponse:
+      type: object
+      properties:
+        approved_post_count:
+          type: integer
+          format: int64
+          description: Distinct logical posts with approved/latest/non-deleted version rows linked to this subject
+          minimum: 0
+        last_approved_post_at:
+          type: [string, 'null']
+          format: date-time
+          description: Latest eligible Post.updated_at in its existing stored clock; null when empty
     PasswordRecoveryRequest:
       type: object
       required: [email]
@@ -1749,7 +1885,7 @@ components:
           type: array
           items:
             type: string
-        departmentIds:
+        department_ids:
           type: array
           items:
             type: integer
@@ -1780,6 +1916,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DepartmentResponse"
+        created_at:
+          type: string
+          format: date-time
+          description: UTC creation time; deployment-time approximation for legacy subjects
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          description: UTC last modification time
+          readOnly: true
     SchoolRequest:
       type: object
       properties:
@@ -2074,6 +2220,16 @@ components:
           type: string
         profile_picture:
           type: string
+        created_at:
+          type: string
+          format: date-time
+          description: UTC creation time; deployment-time approximation for legacy users
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          description: UTC last modification time
+          readOnly: true
     UserSummaryResponse:
       type: object
       properties:
@@ -2092,6 +2248,16 @@ components:
           type: string
         profile_picture:
           type: string
+        created_at:
+          type: string
+          format: date-time
+          description: UTC creation time; deployment-time approximation for legacy users
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          description: UTC last modification time
+          readOnly: true
     FileResponse:
       type: object
       properties:

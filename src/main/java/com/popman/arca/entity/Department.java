@@ -80,11 +80,13 @@ public class Department {
 
     public void addSubject(Subject subject){
         subjects.add(subject);
+        subject.touchUpdatedAt();
         subject.getListDepartments().add(this);
     }
 
     public void removeSubject(Subject subject){
         subjects.remove(subject);
+        subject.touchUpdatedAt();
         subject.getListDepartments().remove(this);
     }
 

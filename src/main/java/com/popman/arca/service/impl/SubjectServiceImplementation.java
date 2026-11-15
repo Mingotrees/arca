@@ -36,6 +36,7 @@ public class SubjectServiceImplementation implements SubjectService{
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public Subject createSubjectV1(SubjectRequest request) {
         if(subjectRepository.existsByCode(request.getCode())){
             throw new RuntimeException("Subject with code : " + request.getCode() + " already exists");
@@ -59,6 +60,7 @@ public class SubjectServiceImplementation implements SubjectService{
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public Subject updateSubjectV1(Long id, SubjectRequest request) {
         Subject existingSubject = getSubjectByIdV1(id);
 
@@ -94,6 +96,8 @@ public class SubjectServiceImplementation implements SubjectService{
         response.setCode(subject.getCode());
         response.setName(subject.getName());
         response.setAliases(subject.getAliases());
+        response.setCreatedAt(subject.getCreatedAt() == null ? null : subject.getCreatedAt().toInstant(java.time.ZoneOffset.UTC));
+        response.setUpdatedAt(subject.getUpdatedAt() == null ? null : subject.getUpdatedAt().toInstant(java.time.ZoneOffset.UTC));
 
         List<DepartmentResponse> departmentResponses = new ArrayList<>();
         for(Department dept : subject.getListDepartments()){

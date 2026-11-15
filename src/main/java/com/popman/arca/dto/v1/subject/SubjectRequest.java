@@ -7,6 +7,7 @@ public class SubjectRequest {
     private String code;
     private String name;
     private List<String> aliases;
+    @com.fasterxml.jackson.annotation.JsonProperty("department_ids")
     private List<Long> departmentIds;
 
     public String getCode() {

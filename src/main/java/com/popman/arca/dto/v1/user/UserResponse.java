@@ -24,6 +24,17 @@ public class UserResponse {
 
     private final List<String> roles;
 
+    @JsonProperty("created_at")
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    @io.swagger.v3.oas.annotations.media.Schema(accessMode = io.swagger.v3.oas.annotations.media.Schema.AccessMode.READ_ONLY,
+            description = "UTC creation time; deployment-time approximation for legacy users")
+    private final java.time.Instant createdAt;
+
+    @JsonProperty("updated_at")
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    @io.swagger.v3.oas.annotations.media.Schema(accessMode = io.swagger.v3.oas.annotations.media.Schema.AccessMode.READ_ONLY, description = "UTC last modification time")
+    private final java.time.Instant updatedAt;
+
     public UserResponse(User user) {
         this.id = user.getId();
         this.firstName = user.getFirstName();
@@ -33,6 +44,8 @@ public class UserResponse {
         this.department = user.getDepartment();
         this.bio = user.getBio();
         this.profilePicture = user.getProfilePicture();
+        this.createdAt = user.getCreatedAt() == null ? null : user.getCreatedAt().toInstant(java.time.ZoneOffset.UTC);
+        this.updatedAt = user.getUpdatedAt() == null ? null : user.getUpdatedAt().toInstant(java.time.ZoneOffset.UTC);
         this.roles = user.getRoles() == null
                 ? List.of()
                 : user.getRoles().stream().sorted().toList();
@@ -73,4 +86,6 @@ public class UserResponse {
     public List<String> getRoles() {
         return roles;
     }
+    public java.time.Instant getCreatedAt() { return createdAt; }
+    public java.time.Instant getUpdatedAt() { return updatedAt; }
 }

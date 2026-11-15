@@ -13,7 +13,7 @@ import java.util.Set;
 
 @Entity
 @DynamicUpdate
-@SQLDelete(sql = "UPDATE users SET is_deleted = true, deleted_at = NOW() WHERE id = ?")
+@SQLDelete(sql = "UPDATE users SET is_deleted = true, deleted_at = NOW(), updated_at = GREATEST(UTC_TIMESTAMP(6), DATE_ADD(updated_at, INTERVAL 1 MICROSECOND)) WHERE id = ?")
 @SQLRestriction("is_deleted = false")
 @Table(name = "users", indexes = {
         @Index(name = "idx_user_id", columnList = "id"),
@@ -48,6 +48,38 @@ public class User {
     @JsonIgnore
     private LocalDateTime deletedAt;
 
+    @JsonIgnore
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @JsonIgnore
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @JsonIgnore
+    @Column(name = "timestamps_approximate", nullable = false, updatable = false)
+    private boolean timestampsApproximate;
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public boolean isTimestampsApproximate() { return timestampsApproximate; }
+
+    public void touchUpdatedAt() {
+        if (updatedAt == null) return;
+        LocalDateTime now = LocalDateTime.now(java.time.ZoneOffset.UTC).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plusNanos(1000);
+    }
+
+    @PrePersist
+    private void initializeProfileTimestamps() {
+        createdAt = LocalDateTime.now(java.time.ZoneOffset.UTC).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        updatedAt = createdAt;
+        timestampsApproximate = false;
+    }
+
+    @PreUpdate
+    private void updateProfileTimestamp() { touchUpdatedAt(); }
+
     // Store multiple roles per user
     // Uses a separate table: user_roles (user_id, role)
     @ElementCollection(fetch = FetchType.EAGER)
@@ -81,11 +113,11 @@ public class User {
 
     // Helper methods for managing roles
     public void addRole(String role) {
-        this.roles.add(role);
+        if (this.roles.add(role)) touchUpdatedAt();
     }
 
     public void removeRole(String role) {
-        this.roles.remove(role);
+        if (this.roles.remove(role)) touchUpdatedAt();
     }
 
     public boolean hasRole(String role) {
@@ -98,6 +130,7 @@ public class User {
     }
 
     public void setRoles(Set<String> roles) {
+        if (!java.util.Objects.equals(this.roles, roles)) touchUpdatedAt();
         this.roles = roles;
     }
 

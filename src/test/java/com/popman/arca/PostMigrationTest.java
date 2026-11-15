@@ -16,7 +16,7 @@ class PostMigrationTest {
         try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
             db.start();
             Flyway flyway = flyway(db);
-            assertEquals(5, flyway.migrate().migrationsExecuted);
+            assertEquals(6, flyway.migrate().migrationsExecuted);
             assertEquals(0, flyway.migrate().migrationsExecuted);
             JdbcTemplate jdbc = jdbc(db);
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM posts", Integer.class));
@@ -49,7 +49,7 @@ class PostMigrationTest {
             assertThrows(Exception.class, () -> flyway(db).migrate());
             Flyway baseline = flyway(db);
             baseline.baseline();
-            assertEquals(4, baseline.migrate().migrationsExecuted);
+            assertEquals(5, baseline.migrate().migrationsExecuted);
             assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM posts WHERE post_id=7 "
                     + "AND is_deleted=false AND deleted_at IS NULL AND deleted_by IS NULL", Integer.class));
             assertEquals(1L, jdbc.queryForObject("SELECT owner_id FROM post_identities WHERE id=7", Long.class));
@@ -98,7 +98,8 @@ class PostMigrationTest {
             jdbc.update("INSERT INTO users(id,email,password,is_deleted) VALUES(1,'retained@example.test','retained-bcrypt',false)");
             jdbc.update("INSERT INTO refresh_tokens(user_id,token,expiry_date) VALUES(1,'retained-session','2027-01-01')");
             var before = jdbc.queryForMap("SELECT * FROM refresh_tokens");
-            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            Flyway recoveryMigration = Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("5").load();
+            assertEquals(1, recoveryMigration.migrate().migrationsExecuted);
             assertEquals(before, jdbc.queryForMap("SELECT * FROM refresh_tokens"));
             assertEquals("retained-bcrypt", jdbc.queryForObject("SELECT password FROM users WHERE id=1", String.class));
             jdbc.update("INSERT INTO password_reset_tokens(user_id,token_hash,created_at,expires_at) VALUES(1,?,UTC_TIMESTAMP(6),DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 15 MINUTE))", "a".repeat(64));
@@ -106,6 +107,31 @@ class PostMigrationTest {
                     "INSERT INTO password_reset_tokens(user_id,token_hash,created_at,expires_at) VALUES(1,?,UTC_TIMESTAMP(6),DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 15 MINUTE))", "a".repeat(64)));
             jdbc.update("DELETE FROM refresh_tokens"); jdbc.update("DELETE FROM users WHERE id=1");
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM password_reset_tokens", Integer.class));
+            assertEquals(0, recoveryMigration.migrate().migrationsExecuted);
+        }
+    }
+
+    @Test
+    void backfillsV5ProfileMetadataAsApproximateAndPreservesExistingData() {
+        try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
+            db.start();
+            Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("5").load().migrate();
+            JdbcTemplate jdbc = jdbc(db);
+            jdbc.update("INSERT INTO users(id,email,password,is_deleted) VALUES(1,'old@example.test','retained-hash',false),(2,'deleted@example.test','retained-hash',true)");
+            jdbc.update("INSERT INTO subjects(id,code,name) VALUES(1,'OLD','Legacy subject')");
+            jdbc.update("INSERT INTO refresh_tokens(user_id,token,expiry_date) VALUES(1,'retained-session','2027-01-01')");
+            var session = jdbc.queryForMap("SELECT * FROM refresh_tokens");
+            java.time.LocalDateTime before = jdbc.queryForObject("SELECT UTC_TIMESTAMP(6)", java.time.LocalDateTime.class);
+            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE created_at IS NOT NULL AND updated_at=created_at AND timestamps_approximate=true", Integer.class));
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM subjects WHERE created_at IS NOT NULL AND updated_at=created_at AND timestamps_approximate=true", Integer.class));
+            assertFalse(jdbc.queryForObject("SELECT created_at FROM users WHERE id=1", java.time.LocalDateTime.class).isBefore(before));
+            assertEquals("retained-hash", jdbc.queryForObject("SELECT password FROM users WHERE id=1", String.class));
+            assertEquals(session, jdbc.queryForMap("SELECT * FROM refresh_tokens"));
+            jdbc.update("INSERT INTO users(id,email,is_deleted) VALUES(3,'new@example.test',false)");
+            jdbc.update("INSERT INTO subjects(id,code,name) VALUES(2,'NEW','New subject')");
+            assertFalse(jdbc.queryForObject("SELECT timestamps_approximate FROM users WHERE id=3", Boolean.class));
+            assertFalse(jdbc.queryForObject("SELECT timestamps_approximate FROM subjects WHERE id=2", Boolean.class));
             assertEquals(0, flyway(db).migrate().migrationsExecuted);
         }
     }

@@ -36,6 +36,7 @@ class PostSearchQueryPlanTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired NamedParameterJdbcTemplate namedJdbc;
     @Autowired PostSearchRepository repository;
+    @Autowired ProfileStatisticsRepository statisticsRepository;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @Autowired EntityManagerFactory entityManagerFactory;
@@ -126,6 +127,23 @@ class PostSearchQueryPlanTest {
         System.out.println("SEARCH_MAPPING JPA statements: size=1:" + single + ", size=100:" + hundred + "; JDBC count/page adds 2");
         assertEquals(single, hundred, "Mapping query count must not scale with authors, subjects or files");
         assertTrue(hundred <= 3, "Two entity fetches and one grouped vote query suffice");
+    }
+
+    @Test
+    void profileAggregatesUseExistingIndexesOnRepresentativeCorpus() throws Exception {
+        JsonNode user = mapper.readTree(jdbc.queryForObject("EXPLAIN FORMAT=JSON " + ProfileStatisticsRepository.USER_STATS_SQL, String.class, 2L));
+        JsonNode subject = mapper.readTree(jdbc.queryForObject("EXPLAIN FORMAT=JSON " + ProfileStatisticsRepository.SUBJECT_STATS_SQL, String.class, 2L));
+        System.out.println("PROFILE_PLAN user " + accesses(user));
+        System.out.println("PROFILE_PLAN subject " + accesses(subject));
+        assertTrue(accesses(user).stream().anyMatch(value -> value.startsWith("p:ref:")
+                && (value.contains("idx_posts_search_author") || value.contains("idx_user_id"))));
+        assertTrue(accesses(user).stream().anyMatch(value -> value.contains("uk_votes_post_user")));
+        assertTrue(accesses(subject).stream().anyMatch(value -> value.contains("idx_post_tags_subject_post")));
+        assertEquals(100, statisticsRepository.user(2L).approvedPostCount());
+        assertEquals(66, statisticsRepository.user(2L).upvotesReceived());
+        assertEquals(34, statisticsRepository.user(2L).downvotesReceived());
+        assertEquals(100, statisticsRepository.subject(2L).approvedPostCount());
+        Files.writeString(Path.of("target/phase-5-query-plans.json"), mapper.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("user", user, "subject", subject)));
     }
 
     private PostSearchCriteria criteria(String q, Long subject, Long department, Long author, String sort) {
