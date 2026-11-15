@@ -16,7 +16,7 @@ class PostMigrationTest {
         try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
             db.start();
             Flyway flyway = flyway(db);
-            assertEquals(6, flyway.migrate().migrationsExecuted);
+            assertEquals(7, flyway.migrate().migrationsExecuted);
             assertEquals(0, flyway.migrate().migrationsExecuted);
             JdbcTemplate jdbc = jdbc(db);
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM posts", Integer.class));
@@ -49,7 +49,7 @@ class PostMigrationTest {
             assertThrows(Exception.class, () -> flyway(db).migrate());
             Flyway baseline = flyway(db);
             baseline.baseline();
-            assertEquals(5, baseline.migrate().migrationsExecuted);
+            assertEquals(6, baseline.migrate().migrationsExecuted);
             assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM posts WHERE post_id=7 "
                     + "AND is_deleted=false AND deleted_at IS NULL AND deleted_by IS NULL", Integer.class));
             assertEquals(1L, jdbc.queryForObject("SELECT owner_id FROM post_identities WHERE id=7", Long.class));
@@ -122,7 +122,7 @@ class PostMigrationTest {
             jdbc.update("INSERT INTO refresh_tokens(user_id,token,expiry_date) VALUES(1,'retained-session','2027-01-01')");
             var session = jdbc.queryForMap("SELECT * FROM refresh_tokens");
             java.time.LocalDateTime before = jdbc.queryForObject("SELECT UTC_TIMESTAMP(6)", java.time.LocalDateTime.class);
-            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            assertEquals(1, Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("6").load().migrate().migrationsExecuted);
             assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE created_at IS NOT NULL AND updated_at=created_at AND timestamps_approximate=true", Integer.class));
             assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM subjects WHERE created_at IS NOT NULL AND updated_at=created_at AND timestamps_approximate=true", Integer.class));
             assertFalse(jdbc.queryForObject("SELECT created_at FROM users WHERE id=1", java.time.LocalDateTime.class).isBefore(before));
@@ -132,7 +132,7 @@ class PostMigrationTest {
             jdbc.update("INSERT INTO subjects(id,code,name) VALUES(2,'NEW','New subject')");
             assertFalse(jdbc.queryForObject("SELECT timestamps_approximate FROM users WHERE id=3", Boolean.class));
             assertFalse(jdbc.queryForObject("SELECT timestamps_approximate FROM subjects WHERE id=2", Boolean.class));
-            assertEquals(0, flyway(db).migrate().migrationsExecuted);
+            assertEquals(0, Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("6").load().migrate().migrationsExecuted);
         }
     }
 
@@ -156,6 +156,25 @@ class PostMigrationTest {
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables "
                     + "WHERE table_schema=DATABASE() AND table_name='post_identities'", Integer.class));
             assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM posts", Integer.class));
+        }
+    }
+
+    @Test
+    void upgradesV6WithNullableCoverWithoutChangingExistingProfileOrSession() {
+        try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
+            db.start();
+            Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("6").load().migrate();
+            JdbcTemplate jdbc = jdbc(db);
+            jdbc.update("INSERT INTO users(id,email,password,profile_picture) VALUES(1,'cover@example.test','retained-hash','profile-pictures/old.png')");
+            jdbc.update("INSERT INTO refresh_tokens(user_id,token,expiry_date) VALUES(1,'retained-session','2027-01-01')");
+            var before = jdbc.queryForMap("SELECT * FROM users WHERE id=1");
+            var session = jdbc.queryForMap("SELECT * FROM refresh_tokens");
+            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            var after = jdbc.queryForMap("SELECT * FROM users WHERE id=1");
+            assertNull(after.remove("cover_picture"));
+            assertEquals(before, after);
+            assertEquals(session, jdbc.queryForMap("SELECT * FROM refresh_tokens"));
+            assertEquals(0, flyway(db).migrate().migrationsExecuted);
         }
     }
 

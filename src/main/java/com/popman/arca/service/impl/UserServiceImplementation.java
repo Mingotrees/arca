@@ -270,34 +270,46 @@ public class UserServiceImplementation implements UserService {
   @Override
   @Transactional
   public String updateProfilePictureV1(Long userId, MultipartFile file) {
+    return updatePicture(userId, file, false);
+  }
+
+  @Override
+  @Transactional
+  public String updateCoverPictureV1(Long userId, MultipartFile file) {
+    return updatePicture(userId, file, true);
+  }
+
+  private String updatePicture(Long userId, MultipartFile file, boolean cover) {
     Path target = null;
+    String directory = cover ? "cover-pictures" : "profile-pictures";
     try {
       validateId(userId);
       var upload = uploadValidator.validate(file, true);
       User user = userRepository.findByIdForUpdate(userId)
           .orElseThrow(() -> new NoSuchElementException("User not found"));
       String filename = java.util.UUID.randomUUID() + upload.extension();
-      String relativePath = "profile-pictures/" + filename;
-      target = mediaStorage.destination(uploadDir, "profile-pictures", filename);
+      String relativePath = directory + "/" + filename;
+      target = mediaStorage.destination(uploadDir, directory, filename);
       Files.write(target, upload.bytes(), java.nio.file.StandardOpenOption.CREATE_NEW);
       Path written = target;
-      String oldPath = user.getProfilePicture();
+      String oldPath = cover ? user.getCoverPicture() : user.getProfilePicture();
       boolean synchronizedTransaction = TransactionSynchronizationManager.isSynchronizationActive();
       if (synchronizedTransaction) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-          @Override public void afterCommit() { deleteOldProfilePicture(oldPath); }
+          @Override public void afterCommit() { deleteOldPicture(oldPath, directory); }
           @Override public void afterCompletion(int status) {
             if (status != STATUS_COMMITTED) cleanupProfilePicture(written);
           }
         });
       }
-      user.setProfilePicture(relativePath);
+      if (cover) user.setCoverPicture(relativePath);
+      else user.setProfilePicture(relativePath);
       userRepository.saveAndFlush(user);
-      if (!synchronizedTransaction) deleteOldProfilePicture(oldPath);
+      if (!synchronizedTransaction) deleteOldPicture(oldPath, directory);
       return relativePath;
     } catch (IOException e) {
       if (target != null) cleanupProfilePicture(target);
-      throw new RuntimeException("Failed to save profile picture", e);
+      throw new RuntimeException("Failed to save " + (cover ? "cover" : "profile") + " picture", e);
     } catch (RuntimeException e) {
       if (target != null) cleanupProfilePicture(target);
       throw e;
@@ -306,17 +318,42 @@ public class UserServiceImplementation implements UserService {
 
   @Override
   public ProfilePictureContent getProfilePictureV1(Long userId) {
+    return getPicture(userId, false);
+  }
+
+  @Override
+  public ProfilePictureContent getCoverPictureV1(Long userId) {
+    return getPicture(userId, true);
+  }
+
+  @Override
+  @Transactional
+  public void deleteCoverPictureV1(Long userId) {
+    validateId(userId);
+    User user = userRepository.findByIdForUpdate(userId)
+        .orElseThrow(() -> new NoSuchElementException("User not found"));
+    String oldPath = user.getCoverPicture();
+    user.setCoverPicture(null);
+    userRepository.saveAndFlush(user);
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+        @Override public void afterCommit() { deleteOldPicture(oldPath, "cover-pictures"); }
+      });
+    } else deleteOldPicture(oldPath, "cover-pictures");
+  }
+
+  private ProfilePictureContent getPicture(Long userId, boolean cover) {
     validateId(userId);
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new NoSuchElementException("User not found with ID: " + userId));
 
-    String storedPath = user.getProfilePicture();
+    String storedPath = cover ? user.getCoverPicture() : user.getProfilePicture();
     if (storedPath == null || storedPath.isBlank()) {
       throw new NoSuchElementException("Profile picture not found");
     }
 
     try {
-      Path candidate = mediaStorage.existing(uploadDir, storedPath, "profile-pictures");
+      Path candidate = mediaStorage.existing(uploadDir, storedPath, cover ? "cover-pictures" : "profile-pictures");
       if (!Files.isRegularFile(candidate, LinkOption.NOFOLLOW_LINKS)) {
         throw new NoSuchElementException("Profile picture not found");
       }
@@ -448,12 +485,12 @@ public class UserServiceImplementation implements UserService {
     }
   }
 
-  private void deleteOldProfilePicture(String storedPath) {
+  private void deleteOldPicture(String storedPath, String directory) {
     if (storedPath == null || storedPath.isBlank()) return;
     try {
-      Files.deleteIfExists(mediaStorage.existing(uploadDir, storedPath, "profile-pictures"));
-    } catch (IOException | InvalidPathException e) {
-      logger.warn("Could not remove replaced profile picture");
+      Files.deleteIfExists(mediaStorage.existing(uploadDir, storedPath, directory));
+    } catch (IOException | InvalidPathException | SecurityException e) {
+      logger.warn("Could not remove previous user image");
     }
   }
 

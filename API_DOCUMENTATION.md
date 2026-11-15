@@ -10961,6 +10961,10 @@ This operation does not require authentication
 |files|[[FileResponse](#schemafileresponse)]|false|none|none|
 |isLatestVersion|boolean|false|none|none|
 |latestVersion|boolean|false|none|none|
+# Phase 6 contract update
+
+`/api/v1/user/{userId}/cover-picture`: owner/admin `PUT` accepts multipart `file` and returns `user_id`, `cover_picture`, `message`; public `GET` returns binary JPEG/PNG/WebP with no-store/nosniff headers; owner/admin `DELETE` returns a message and is idempotent for an existing user without a cover. Missing user/reference/object reads return 404. `UserResponse` adds optional read-only `cover_picture` (relative storage key, omitted when absent). Covers use the existing 10 MiB/25-million-pixel image validator and separate `cover-pictures/` storage with commit/rollback-aware cleanup. See [Phase 6 operations](docs/phase-6-operations.md) and [openapi.yaml](openapi.yaml) for authorization, errors, V7 rollout and cleanup assumptions.
+
 # Phase 5 contract update
 
 Authenticated GET `/api/v1/user/{userId}/stats` returns `approved_post_count`, `upvotes_received`, `downvotes_received`; GET `/api/v1/subject/{subjectId}/stats` returns `approved_post_count`, `last_approved_post_at` (null for no eligible posts). Counts use approved/latest/non-deleted version rows and deduplicate logical post IDs. User/subject responses add optional UTC created_at/updated_at fields; legacy creation times are deployment-time approximations recorded internally. Existing response fields and JWT access rules remain. See [Phase 5 operations](docs/phase-5-operations.md) and [openapi.yaml](openapi.yaml) for clock/provenance, retained deletion semantics, indexed query evidence and V6 rollout.

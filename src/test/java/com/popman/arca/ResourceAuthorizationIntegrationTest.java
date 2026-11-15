@@ -321,6 +321,136 @@ class ResourceAuthorizationIntegrationTest {
         org.junit.jupiter.api.Assertions.assertTrue(postProperties.path("user_id").path("deprecated").asBoolean());
     }
 
+    @ParameterizedTest
+    @CsvSource({"1,200", "2,403", "3,200"})
+    void coverWritesRequireOwnerOrAdmin(long actor, int expected) throws Exception {
+        mvc.perform(multipart(org.springframework.http.HttpMethod.PUT, "/api/v1/user/1/cover-picture")
+                        .file(new MockMultipartFile("file", "../../cover.png", "image/png", png()))
+                        .with(user(principal(actor))))
+                .andExpect(status().is(expected));
+        mvc.perform(delete("/api/v1/user/1/cover-picture").with(user(principal(actor))))
+                .andExpect(status().is(expected));
+    }
+
+    @Test
+    void coverLifecycleIsPublicDiscoverableAndIndependentOfAvatarAndAttachments() throws Exception {
+        Path avatar = Files.createDirectories(media.resolve("profile-pictures")).resolve("keep.png");
+        Files.write(avatar, png());
+        jdbc.update("UPDATE users SET profile_picture='profile-pictures/keep.png' WHERE id=1");
+        mvc.perform(get("/api/v1/user/1/cover-picture")).andExpect(status().isNotFound());
+        mvc.perform(multipart(org.springframework.http.HttpMethod.PUT, "/api/v1/user/1/cover-picture")
+                .file(new MockMultipartFile("file", "cover.png", "image/png", png())))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/v1/user/1/cover-picture")).andExpect(status().isUnauthorized());
+        mvc.perform(multipart(org.springframework.http.HttpMethod.PUT, "/api/v1/user/1/cover-picture")
+                        .file(new MockMultipartFile("file", "../../cover.png", "image/png", png())).with(user(principal(1))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.user_id").value(1))
+                .andExpect(jsonPath("$.cover_picture").value(org.hamcrest.Matchers.matchesPattern("cover-pictures/[0-9a-f-]{36}\\.png")));
+        String old = jdbc.queryForObject("SELECT cover_picture FROM users WHERE id=1", String.class);
+        mvc.perform(get("/api/v1/user/1").with(user(principal(2))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.cover_picture").value(old));
+        mvc.perform(get("/api/v1/user/1/cover-picture"))
+                .andExpect(status().isOk()).andExpect(content().bytes(png())).andExpect(content().contentType("image/png"))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("Content-Disposition", "inline; filename=\"cover-picture\""));
+        mvc.perform(multipart(org.springframework.http.HttpMethod.PUT, "/api/v1/user/1/cover-picture")
+                        .file(new MockMultipartFile("file", "cover.png", "image/png", png())).with(user(principal(3))))
+                .andExpect(status().isOk());
+        org.junit.jupiter.api.Assertions.assertFalse(Files.exists(media.resolve(old)));
+        String replacement = jdbc.queryForObject("SELECT cover_picture FROM users WHERE id=1", String.class);
+        mvc.perform(delete("/api/v1/user/1/cover-picture").with(user(principal(1)))).andExpect(status().isOk());
+        org.junit.jupiter.api.Assertions.assertFalse(Files.exists(media.resolve(replacement)));
+        mvc.perform(delete("/api/v1/user/1/cover-picture").with(user(principal(1)))).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/user/1/cover-picture")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/user/1/profile-picture")).andExpect(status().isOk()).andExpect(content().bytes(png()));
+        org.junit.jupiter.api.Assertions.assertTrue(Files.exists(media.resolve("posts/10/test.pdf")));
+    }
+
+    @Test
+    void coverReplacementAndRemovalRollbackRetainUsableOldObject() throws Exception {
+        // Use HTTP first so absence of the feature fails before any schema assumptions.
+        mvc.perform(multipart(org.springframework.http.HttpMethod.PUT, "/api/v1/user/1/cover-picture")
+                        .file(new MockMultipartFile("file", "cover.png", "image/png", png())).with(user(principal(1))))
+                .andExpect(status().isOk());
+        String old = jdbc.queryForObject("SELECT cover_picture FROM users WHERE id=1", String.class);
+        for (boolean remove : new boolean[]{false, true}) {
+            new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+                try {
+                    if (remove) mvc.perform(delete("/api/v1/user/1/cover-picture").with(user(principal(1)))).andExpect(status().isOk());
+                    else mvc.perform(multipart(org.springframework.http.HttpMethod.PUT, "/api/v1/user/1/cover-picture")
+                                    .file(new MockMultipartFile("file", "cover.png", "image/png", png())).with(user(principal(1))))
+                            .andExpect(status().isOk());
+                    org.junit.jupiter.api.Assertions.assertTrue(Files.exists(media.resolve(old)));
+                } catch (Exception e) { throw new RuntimeException(e); }
+                tx.setRollbackOnly();
+            });
+            assertEquals(old, jdbc.queryForObject("SELECT cover_picture FROM users WHERE id=1", String.class));
+            mvc.perform(get("/api/v1/user/1/cover-picture")).andExpect(status().isOk()).andExpect(content().bytes(png()));
+            try (var paths = Files.list(media.resolve("cover-pictures"))) { assertEquals(1, paths.count()); }
+        }
+    }
+
+    @Test
+    void coverValidationRejectsInvalidImagesWithoutReferencesOrOrphans() throws Exception {
+        byte[] bomb = png();
+        java.nio.ByteBuffer.wrap(bomb).putInt(16, 100_000).putInt(20, 100_000);
+        for (MockMultipartFile invalid : new MockMultipartFile[]{
+                new MockMultipartFile("file", "cover.png", "image/png", new byte[0]),
+                new MockMultipartFile("file", "cover.png", "image/png", "spoof".getBytes()),
+                new MockMultipartFile("file", "cover.pdf", "application/pdf", "%PDF-1.7".getBytes()),
+                new MockMultipartFile("file", "cover.png", "image/png", bomb),
+                new MockMultipartFile("file", "cover.png", "image/png", new byte[10 * 1024 * 1024 + 1])}) {
+            var response = mvc.perform(multipart(org.springframework.http.HttpMethod.PUT, "/api/v1/user/1/cover-picture")
+                    .file(invalid).with(user(principal(1)))).andReturn().getResponse();
+            org.junit.jupiter.api.Assertions.assertTrue(java.util.Set.of(400, 413, 415).contains(response.getStatus()),
+                    "Expected validation error, got " + response.getStatus());
+            org.junit.jupiter.api.Assertions.assertNull(jdbc.queryForObject("SELECT cover_picture FROM users WHERE id=1", String.class));
+            org.junit.jupiter.api.Assertions.assertFalse(Files.exists(media.resolve("cover-pictures")));
+        }
+    }
+
+    @Test
+    void coverMissingObjectsAndCorruptKeysNeverReadOrDeleteOtherMedia() throws Exception {
+        mvc.perform(get("/api/v1/user/999/cover-picture")).andExpect(status().isNotFound());
+        for (String key : new String[]{"cover-pictures/missing.png", "posts/10/test.pdf", "../outside.png"}) {
+            jdbc.update("UPDATE users SET cover_picture=? WHERE id=1", key);
+            mvc.perform(get("/api/v1/user/1/cover-picture")).andExpect(status().isNotFound());
+            mvc.perform(delete("/api/v1/user/1/cover-picture").with(user(principal(1)))).andExpect(status().isOk());
+            org.junit.jupiter.api.Assertions.assertNull(jdbc.queryForObject("SELECT cover_picture FROM users WHERE id=1", String.class));
+            org.junit.jupiter.api.Assertions.assertTrue(Files.exists(media.resolve("posts/10/test.pdf")));
+        }
+    }
+
+    @Test
+    void staleProfileEditCannotResurrectRemovedCover() throws Exception {
+        Path old = Files.createDirectories(media.resolve("cover-pictures")).resolve("old.png");
+        Files.write(old, png());
+        jdbc.update("UPDATE users SET cover_picture='cover-pictures/old.png' WHERE id=1");
+        var loaded = new java.util.concurrent.CountDownLatch(1);
+        var resume = new java.util.concurrent.CountDownLatch(1);
+        try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            var edit = executor.submit(() -> new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+                assertEquals("cover-pictures/old.png", userRepository.findById(1L).orElseThrow().getCoverPicture());
+                loaded.countDown();
+                try { org.junit.jupiter.api.Assertions.assertTrue(resume.await(10, java.util.concurrent.TimeUnit.SECONDS)); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new RuntimeException(e); }
+                var request = new com.popman.arca.dto.v1.user.UserUpdateRequest();
+                request.setBio("Concurrent cover edit");
+                users.updateUserV1(1L, request);
+            }));
+            try {
+                org.junit.jupiter.api.Assertions.assertTrue(loaded.await(10, java.util.concurrent.TimeUnit.SECONDS));
+                mvc.perform(delete("/api/v1/user/1/cover-picture").with(user(principal(1)))).andExpect(status().isOk());
+            } finally { resume.countDown(); }
+            edit.get(10, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        org.junit.jupiter.api.Assertions.assertNull(jdbc.queryForObject("SELECT cover_picture FROM users WHERE id=1", String.class));
+        assertEquals("Concurrent cover edit", jdbc.queryForObject("SELECT bio FROM users WHERE id=1", String.class));
+        org.junit.jupiter.api.Assertions.assertFalse(Files.exists(old));
+        mvc.perform(get("/api/v1/user/1/cover-picture")).andExpect(status().isNotFound());
+    }
+
     private byte[] png() throws Exception {
         var output = new java.io.ByteArrayOutputStream();
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", output);

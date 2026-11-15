@@ -112,13 +112,13 @@ Registration grants `ROLE_USER`. A fresh database has no seeded admin account or
 
 ## API
 
-Most `/api/v1` routes require `Authorization: Bearer <access_token>`. Authentication routes and profile-picture reads are public; moderation, taxonomy mutations, and `/api/v1/admin/**` require `ROLE_ADMIN`. JSON uses `snake_case`.
+Most `/api/v1` routes require `Authorization: Bearer <access_token>`. Authentication routes and profile-picture/cover-picture reads are public; moderation, taxonomy mutations, and `/api/v1/admin/**` require `ROLE_ADMIN`. JSON uses `snake_case`.
 
 | Area | Routes |
 | --- | --- |
 | Authentication | `/api/v1/auth/register`, `/login`, `/refresh`, `/logout` under the auth prefix |
 | Password recovery | `/api/v1/auth/password-recovery`, `/api/v1/auth/password-reset` — anonymous, enabled after provider configuration |
-| Profiles | `/api/v1/user/me`, `/api/v1/user/search`, `/api/v1/user/{userId}/profile-picture` |
+| Profiles | `/api/v1/user/me`, `/api/v1/user/search`, `/api/v1/user/{userId}/profile-picture`, `/api/v1/user/{userId}/cover-picture` |
 | Profile statistics | `/api/v1/user/{userId}/stats`, `/api/v1/subject/{subjectId}/stats` — aggregate DTOs, authenticated profile access |
 | Posts | `/api/v1/posts`, `/mine`, `/subject/{subjectId}`, `/department/{departmentId}`, `/user/{userId}` under the posts prefix |
 | Search | `/api/v1/posts/search` — combined filters and stable paged results; legacy lists remain arrays |

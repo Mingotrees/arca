@@ -23,4 +23,7 @@ public interface UserService {
 
     String updateProfilePictureV1(Long userId, MultipartFile file);
     ProfilePictureContent getProfilePictureV1(Long userId);
+    String updateCoverPictureV1(Long userId, MultipartFile file);
+    ProfilePictureContent getCoverPictureV1(Long userId);
+    void deleteCoverPictureV1(Long userId);
 }

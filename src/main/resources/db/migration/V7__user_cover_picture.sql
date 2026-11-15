@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN cover_picture VARCHAR(255) NULL;

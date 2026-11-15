@@ -399,6 +399,100 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MessageResponse"
+  /api/v1/user/{userId}/cover-picture:
+    get:
+      tags: [user-controller]
+      summary: Read public user cover
+      description: Public cover image. Missing user, reference or stored object returns 404. Responses use no-store and nosniff.
+      operationId: getCoverPicture
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Cover picture
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Cover picture not found
+      security: []
+    put:
+      tags: [user-controller]
+      summary: Upload or replace user cover
+      security:
+      - bearerAuth: []
+      description: Owner/admin uploads JPEG, PNG or WebP. Maximum 10 MiB per file/request and 25000000 decoded pixels. Replaced objects are removed after commit.
+      operationId: updateCoverPicture
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required: [file]
+      responses:
+        '200':
+          description: Cover picture updated
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CoverPictureResponse'
+        '400':
+          description: Invalid or mismatched image
+        '401':
+          description: Authentication required
+        '403':
+          description: Only owner/admin may replace cover
+        '404':
+          description: User not found
+        '413':
+          description: Upload exceeds 10 MiB limit
+        '415':
+          description: Unsupported media type or extension
+    delete:
+      tags: [user-controller]
+      summary: Remove user cover
+      security:
+      - bearerAuth: []
+      description: Owner/admin removes cover. Idempotent for an existing user with no cover; file cleanup occurs after commit.
+      operationId: deleteCoverPicture
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Cover removed
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Authentication required
+        '403':
+          description: Only owner/admin may remove cover
+        '404':
+          description: User not found
   /api/v1/user/{userId}/profile-picture:
     get:
       tags:
@@ -2196,6 +2290,16 @@ components:
           type: string
         reason:
           type: string
+    CoverPictureResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        cover_picture:
+          type: string
+        message:
+          type: string
     UserResponse:
       type: object
       properties:
@@ -2220,6 +2324,10 @@ components:
           type: string
         profile_picture:
           type: string
+        cover_picture:
+          type: string
+          description: Optional relative cover storage key; retrieve bytes from GET /api/v1/user/{userId}/cover-picture
+          readOnly: true
         created_at:
           type: string
           format: date-time
