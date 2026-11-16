@@ -84,6 +84,8 @@ class PostSearchQueryPlanTest {
         jdbc.batchUpdate("INSERT INTO post_tags(post_id,subject_id) VALUES(?,?)", tags);
         jdbc.batchUpdate("INSERT INTO votes(post_id,user_id,vote_type) VALUES(?,?,?)", votes);
         jdbc.batchUpdate("INSERT INTO files(post_id,user_id,file_name,file_type,file_size) VALUES(?,?,?,?,?)", files);
+        jdbc.update("INSERT INTO post_links(post_id,url,normalized_url,normalized_hash,position) "
+                + "SELECT id,'https://example.test/reference','https://example.test/reference',SHA2('https://example.test/reference',256),0 FROM posts");
     }
 
     @Test
@@ -122,11 +124,12 @@ class PostSearchQueryPlanTest {
         long single = statistics.getPrepareStatementCount();
         statistics.clear();
         mvc.perform(get("/api/v1/posts/search").param("size", "100").with(user(new UserPrincipal(actor))))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk()).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.content[0].links[0].url").value("https://example.test/reference"));
         long hundred = statistics.getPrepareStatementCount();
         System.out.println("SEARCH_MAPPING JPA statements: size=1:" + single + ", size=100:" + hundred + "; JDBC count/page adds 2");
         assertEquals(single, hundred, "Mapping query count must not scale with authors, subjects or files");
-        assertTrue(hundred <= 3, "Two entity fetches and one grouped vote query suffice");
+        assertTrue(hundred <= 4, "Three separate entity/collection fetches and one grouped vote query suffice");
     }
 
     @Test

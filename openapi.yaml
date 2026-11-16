@@ -2037,6 +2037,31 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DepartmentResponse"
+    PostLinkRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          maxLength: 2048
+          description: Absolute HTTP(S) display URL; no credentials, controls or whitespace
+        label:
+          type: [string, 'null']
+          maxLength: 200
+          description: Optional plain-text label; blank becomes null
+    PostLinkResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        label:
+          type: [string, 'null']
+        position:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 9
+          description: Zero-based submitted order within this version
     PostUpdateRequest:
       type: object
       properties:
@@ -2046,6 +2071,13 @@ components:
           minLength: 0
         content:
           type: string
+        links:
+          type: [array, 'null']
+          description: Ordered HTTP(S) links, maximum 10. Omitted/null copies source version links; [] clears only the new version; canonical duplicates reject the request.
+          items:
+            $ref: '#/components/schemas/PostLinkRequest'
+          maxItems: 10
+          minItems: 0
         post_tag:
           type: string
     PostUpdateResponse:
@@ -2156,6 +2188,13 @@ components:
         content:
           type: string
           minLength: 1
+        links:
+          type: [array, 'null']
+          description: Optional ordered HTTP(S) links, maximum 10. Omitted/null creates no links; canonical duplicates reject the request.
+          items:
+            $ref: '#/components/schemas/PostLinkRequest'
+          maxItems: 10
+          minItems: 0
         user_id:
           type: integer
           format: int64
@@ -2435,6 +2474,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FileResponse"
+        links:
+          type: array
+          description: Ordered links belonging to this version; empty array for none
+          items:
+            $ref: '#/components/schemas/PostLinkResponse'
         is_latest_version:
           type: boolean
     PostSubjectResponse:

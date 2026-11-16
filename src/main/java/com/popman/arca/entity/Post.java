@@ -84,6 +84,13 @@ public class Post {
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<File> files = new ArrayList<>();
 
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("position ASC")
+    private List<PostLink> links = new ArrayList<>();
+
+    public List<PostLink> getLinks() { return links; }
+    public void addLink(PostLink link) { link.setPost(this); links.add(link); }
+
     public Post() {}
 
     public List<File> getFiles() {

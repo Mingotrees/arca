@@ -25,6 +25,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("SELECT DISTINCT p FROM Post p LEFT JOIN FETCH p.files WHERE p.id IN :ids")
     List<Post> fetchSearchPageFiles(@Param("ids") List<Long> ids);
 
+    @Query("SELECT DISTINCT p FROM Post p LEFT JOIN FETCH p.links WHERE p.id IN :ids")
+    List<Post> fetchSearchPageLinks(@Param("ids") List<Long> ids);
+
     // All writers for an existing logical post must acquire this lock FIRST.
     // The identity row remains a stable lock anchor even after soft deletion.
     @Query(value = "SELECT identity_row.id FROM post_identities identity_row WHERE identity_row.id = " +

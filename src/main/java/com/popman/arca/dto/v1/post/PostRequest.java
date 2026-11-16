@@ -24,6 +24,12 @@ public class PostRequest {
     @com.fasterxml.jackson.annotation.JsonProperty("post_tag")
     private String postTag;
 
+    @io.swagger.v3.oas.annotations.media.Schema(types = {"array", "null"}, description = "Optional ordered HTTP(S) links, maximum 10. Omitted/null creates no links; canonical duplicates reject the request.")
+    @jakarta.validation.constraints.Size(max = 10)
+    private java.util.List<PostLinkRequest> links;
+    public java.util.List<PostLinkRequest> getLinks() { return links; }
+    public void setLinks(java.util.List<PostLinkRequest> links) { this.links = links; }
+
     public PostRequest() {}
 
     // Getters and Setters

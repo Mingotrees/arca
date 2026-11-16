@@ -16,7 +16,7 @@ class PostMigrationTest {
         try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
             db.start();
             Flyway flyway = flyway(db);
-            assertEquals(7, flyway.migrate().migrationsExecuted);
+            assertEquals(8, flyway.migrate().migrationsExecuted);
             assertEquals(0, flyway.migrate().migrationsExecuted);
             JdbcTemplate jdbc = jdbc(db);
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM posts", Integer.class));
@@ -49,7 +49,7 @@ class PostMigrationTest {
             assertThrows(Exception.class, () -> flyway(db).migrate());
             Flyway baseline = flyway(db);
             baseline.baseline();
-            assertEquals(6, baseline.migrate().migrationsExecuted);
+            assertEquals(7, baseline.migrate().migrationsExecuted);
             assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM posts WHERE post_id=7 "
                     + "AND is_deleted=false AND deleted_at IS NULL AND deleted_by IS NULL", Integer.class));
             assertEquals(1L, jdbc.queryForObject("SELECT owner_id FROM post_identities WHERE id=7", Long.class));
@@ -169,11 +169,45 @@ class PostMigrationTest {
             jdbc.update("INSERT INTO refresh_tokens(user_id,token,expiry_date) VALUES(1,'retained-session','2027-01-01')");
             var before = jdbc.queryForMap("SELECT * FROM users WHERE id=1");
             var session = jdbc.queryForMap("SELECT * FROM refresh_tokens");
-            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            Flyway coverMigration = Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("7").load();
+            assertEquals(1, coverMigration.migrate().migrationsExecuted);
             var after = jdbc.queryForMap("SELECT * FROM users WHERE id=1");
             assertNull(after.remove("cover_picture"));
             assertEquals(before, after);
             assertEquals(session, jdbc.queryForMap("SELECT * FROM refresh_tokens"));
+            assertEquals(0, coverMigration.migrate().migrationsExecuted);
+        }
+    }
+
+    @Test
+    void upgradesV7WithVersionScopedLinksAndConstraintsWithoutChangingPosts() {
+        try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
+            db.start();
+            Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("7").load().migrate();
+            JdbcTemplate jdbc = jdbc(db);
+            jdbc.update("INSERT INTO users(id,email) VALUES(1,'links@example.test')");
+            jdbc.update("INSERT INTO school(id,name) VALUES(1,'School')");
+            jdbc.update("INSERT INTO departments(id,name,school_id) VALUES(1,'Department',1)");
+            jdbc.update("INSERT INTO post_identities(id,owner_id) VALUES(7,1)");
+            jdbc.update("INSERT INTO posts(id,post_id,version,title,content,status,user_id,department_id,is_latest_version,created_at,updated_at) "
+                    + "VALUES(10,7,1,'Legacy','Content','APPROVED',1,1,true,NOW(),NOW()),(11,7,2,'Pending','Body','PENDING_APPROVAL',1,1,true,NOW(),NOW())");
+            jdbc.update("INSERT INTO files(post_id,user_id,file_name) VALUES(10,1,'retained.pdf')");
+            var before = jdbc.queryForList("SELECT * FROM posts ORDER BY id");
+            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            assertEquals(before, jdbc.queryForList("SELECT * FROM posts ORDER BY id"));
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM files", Integer.class));
+            String insert = "INSERT INTO post_links(post_id,url,normalized_url,normalized_hash,position) VALUES(?,'https://example.test/','https://example.test/',?,?)";
+            jdbc.update(insert, 10, "a".repeat(64), 0);
+            jdbc.update(insert, 11, "a".repeat(64), 0);
+            assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> jdbc.update(insert, 10, "a".repeat(64), 1));
+            assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> jdbc.update(insert, 10, "b".repeat(64), 0));
+            assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> jdbc.update(insert, 999, "b".repeat(64), 0));
+            var invalidPosition = assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(insert, 10, "b".repeat(64), 10));
+            assertEquals(3819, ((java.sql.SQLException) invalidPosition.getCause()).getErrorCode());
+            jdbc.update("UPDATE posts SET is_deleted=true WHERE id=10");
+            assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM post_links", Integer.class));
+            jdbc.update("DELETE FROM posts WHERE id=11");
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM post_links", Integer.class));
             assertEquals(0, flyway(db).migrate().migrationsExecuted);
         }
     }
