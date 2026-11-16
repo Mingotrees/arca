@@ -49,6 +49,12 @@ public class Post {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    public LocalDateTime getApprovedAt() { return approvedAt; }
+    public void setApprovedAt(LocalDateTime approvedAt) { this.approvedAt = approvedAt; }
+
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 

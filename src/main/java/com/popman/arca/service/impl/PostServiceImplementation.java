@@ -275,6 +275,7 @@ public class PostServiceImplementation implements PostService {
 
         if (approvalRequest.getApproved()) {
             post.setStatus("APPROVED");
+            post.setApprovedAt(LocalDateTime.now(java.time.ZoneOffset.UTC));
 
             if (post.getVersion() > 1) {
                 Post previousApproved = postRepository

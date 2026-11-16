@@ -16,7 +16,7 @@ class PostMigrationTest {
         try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
             db.start();
             Flyway flyway = flyway(db);
-            assertEquals(8, flyway.migrate().migrationsExecuted);
+            assertEquals(9, flyway.migrate().migrationsExecuted);
             assertEquals(0, flyway.migrate().migrationsExecuted);
             JdbcTemplate jdbc = jdbc(db);
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM posts", Integer.class));
@@ -49,7 +49,7 @@ class PostMigrationTest {
             assertThrows(Exception.class, () -> flyway(db).migrate());
             Flyway baseline = flyway(db);
             baseline.baseline();
-            assertEquals(7, baseline.migrate().migrationsExecuted);
+            assertEquals(8, baseline.migrate().migrationsExecuted);
             assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM posts WHERE post_id=7 "
                     + "AND is_deleted=false AND deleted_at IS NULL AND deleted_by IS NULL", Integer.class));
             assertEquals(1L, jdbc.queryForObject("SELECT owner_id FROM post_identities WHERE id=7", Long.class));
@@ -193,7 +193,8 @@ class PostMigrationTest {
                     + "VALUES(10,7,1,'Legacy','Content','APPROVED',1,1,true,NOW(),NOW()),(11,7,2,'Pending','Body','PENDING_APPROVAL',1,1,true,NOW(),NOW())");
             jdbc.update("INSERT INTO files(post_id,user_id,file_name) VALUES(10,1,'retained.pdf')");
             var before = jdbc.queryForList("SELECT * FROM posts ORDER BY id");
-            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            Flyway linksMigration = Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("8").load();
+            assertEquals(1, linksMigration.migrate().migrationsExecuted);
             assertEquals(before, jdbc.queryForList("SELECT * FROM posts ORDER BY id"));
             assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM files", Integer.class));
             String insert = "INSERT INTO post_links(post_id,url,normalized_url,normalized_hash,position) VALUES(?,'https://example.test/','https://example.test/',?,?)";
@@ -208,6 +209,28 @@ class PostMigrationTest {
             assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM post_links", Integer.class));
             jdbc.update("DELETE FROM posts WHERE id=11");
             assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM post_links", Integer.class));
+            assertEquals(0, linksMigration.migrate().migrationsExecuted);
+        }
+    }
+
+    @Test
+    void upgradesV8WithoutInventingLegacyApprovalDatesOrChangingStoredData() {
+        try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
+            db.start();
+            Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("8").load().migrate();
+            JdbcTemplate jdbc = jdbc(db);
+            jdbc.update("INSERT INTO users(id,email) VALUES(1,'legacy@example.test')");
+            jdbc.update("INSERT INTO school(id,name) VALUES(1,'School')");
+            jdbc.update("INSERT INTO departments(id,name,school_id) VALUES(1,'Department',1)");
+            jdbc.update("INSERT INTO post_identities(id,owner_id) VALUES(1,1)");
+            jdbc.update("INSERT INTO posts(id,post_id,version,title,content,status,user_id,department_id,is_latest_version,created_at,updated_at) "
+                    + "VALUES(1,1,1,'Old','Body','SUPERSEDED',1,1,false,'2026-01-01','2026-01-02'),"
+                    + "(2,1,2,'New','Body','APPROVED',1,1,true,'2026-01-03','2026-01-04')");
+            var before = jdbc.queryForList("SELECT * FROM posts ORDER BY id");
+            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            var after = jdbc.queryForList("SELECT * FROM posts ORDER BY id");
+            after.forEach(row -> assertNull(row.remove("approved_at")));
+            assertEquals(before, after);
             assertEquals(0, flyway(db).migrate().migrationsExecuted);
         }
     }

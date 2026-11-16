@@ -153,6 +153,44 @@ class PostSearchQueryPlanTest {
         return new PostSearchCriteria(q, subject, department, author, null, null, 0, 20, sort, null);
     }
 
+    @Test
+    void dashboardUsesSevenRealQueriesOnTenThousandPostsAndCapturesPlans() throws Exception {
+        Map<String, JsonNode> plans = new LinkedHashMap<>();
+        Map<String, String> queries = Map.of("users", AdminDashboardRepository.USERS_SQL,
+                "roles", AdminDashboardRepository.ROLES_SQL, "status", AdminDashboardRepository.STATUS_SQL,
+                "activity", AdminDashboardRepository.ACTIVITY_SQL, "files", AdminDashboardRepository.FILES_SQL,
+                "votes", AdminDashboardRepository.VOTES_SQL, "vaults", AdminDashboardRepository.VAULTS_SQL);
+        var from = java.time.LocalDateTime.parse("2026-01-01T00:00:00");
+        var to = from.plusDays(90);
+        for (var entry : queries.entrySet()) {
+            Object[] parameters = entry.getKey().equals("activity") ? new Object[]{from, to, from, to} : new Object[0];
+            plans.put(entry.getKey(), mapper.readTree(jdbc.queryForObject("EXPLAIN FORMAT=JSON " + entry.getValue(), String.class, parameters)));
+        }
+        var count = new java.util.concurrent.atomic.AtomicInteger();
+        try (var connection = jdbc.getDataSource().getConnection()) {
+            var counted = (java.sql.Connection) java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),
+                    new Class<?>[]{java.sql.Connection.class}, (proxy, method, args) -> {
+                        if (method.getName().equals("prepareStatement") || method.getName().equals("createStatement")) count.incrementAndGet();
+                        try { return method.invoke(connection, args); }
+                        catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                    });
+            var repository = new AdminDashboardRepository(new JdbcTemplate(new org.springframework.jdbc.datasource.SingleConnectionDataSource(counted, true)));
+            long start = System.nanoTime();
+            var result = repository.dashboard(from, to, java.time.Instant.now());
+            long elapsed = (System.nanoTime() - start) / 1_000_000;
+            assertEquals(7, count.get(), "Aggregate query count must not scale with corpus size");
+            assertEquals(9800, result.posts().active());
+            assertEquals(200, result.posts().deleted());
+            assertEquals(10000, result.posts().createdInPeriod());
+            assertEquals(8000, result.posts().legacyApprovedVersionsWithoutDate());
+            assertEquals(1800, result.moderation().pending());
+            assertEquals(20000, result.engagement().attachmentBytes());
+            System.out.println("DASHBOARD_QUERIES count=" + count.get() + " posts=10000 elapsed_ms=" + elapsed);
+            for (var entry : plans.entrySet()) System.out.println("DASHBOARD_PLAN " + entry.getKey() + " " + accesses(entry.getValue()));
+            Files.writeString(Path.of("target/phase-8-query-plans.json"), mapper.writerWithDefaultPrettyPrinter().writeValueAsString(plans));
+        }
+    }
+
     private List<String> accesses(JsonNode node) {
         List<String> result = new ArrayList<>();
         if (node.has("table_name")) result.add(node.path("table_name").asText() + ":" + node.path("access_type").asText()
