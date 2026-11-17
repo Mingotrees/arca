@@ -35,7 +35,7 @@ class PostLinksIntegrationTest {
 
     @BeforeEach
     void seed() {
-        for (String table : new String[]{"files", "votes", "vaults", "post_tags", "posts", "post_identities",
+        for (String table : new String[]{"audit_events", "files", "votes", "vaults", "post_tags", "posts", "post_identities",
                 "user_roles", "refresh_tokens", "department_subjects", "subject_aliases", "subjects", "departments", "school", "users"})
             jdbc.update("DELETE FROM " + table);
         jdbc.update("INSERT INTO users(id,email,is_deleted) VALUES(1,'owner@example.test',false),(2,'other@example.test',false),(3,'admin@example.test',false)");

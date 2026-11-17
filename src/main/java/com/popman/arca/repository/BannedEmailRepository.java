@@ -7,6 +7,7 @@ import java.util.Optional;
 
 public interface BannedEmailRepository extends JpaRepository<BannedEmail, Long> {
     boolean existsByEmailIgnoreCase(String email);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     Optional<BannedEmail> findByEmailIgnoreCase(String email);
     void deleteByEmailIgnoreCase(String email);
 }

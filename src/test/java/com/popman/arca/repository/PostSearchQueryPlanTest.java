@@ -198,4 +198,29 @@ class PostSearchQueryPlanTest {
         node.elements().forEachRemaining(child -> { if (child.isContainerNode()) result.addAll(accesses(child)); });
         return result;
     }
+
+    @Test
+    void auditQueriesUseBoundedIndexedPagesOnTenThousandEvents() throws Exception {
+        jdbc.update("DELETE FROM audit_events");
+        var rows = new ArrayList<Object[]>();
+        for (int i = 0; i < 10000; i++) rows.add(new Object[]{i % 100 + 1, i + 1});
+        jdbc.batchUpdate("INSERT INTO audit_events(actor_id,action,target_type,target_id,outcome,occurred_at,correlation_id,metadata) "
+                + "VALUES(?,'LOGIN','USER',?,'SUCCESS','2026-11-01','corpus','{}')", rows);
+        jdbc.execute("ANALYZE TABLE audit_events");
+        Map<String, JsonNode> plans = new LinkedHashMap<>();
+        plans.put("time", mapper.readTree(jdbc.queryForObject("EXPLAIN FORMAT=JSON " + AuditEventRepository.SELECT_COLUMNS
+                + " FROM audit_events WHERE occurred_at>=? AND occurred_at<? ORDER BY occurred_at DESC,id DESC LIMIT 100", String.class, "2026-11-01", "2026-11-02")));
+        plans.put("actor", mapper.readTree(jdbc.queryForObject("EXPLAIN FORMAT=JSON " + AuditEventRepository.SELECT_COLUMNS
+                + " FROM audit_events WHERE occurred_at>=? AND occurred_at<? AND actor_id=? ORDER BY occurred_at DESC,id DESC LIMIT 100", String.class, "2026-11-01", "2026-11-02", 1)));
+        assertTrue(accesses(plans.get("time")).stream().anyMatch(s -> s.contains("idx_audit_time")));
+        assertTrue(accesses(plans.get("actor")).stream().anyMatch(s -> s.contains("idx_audit_actor")));
+        var repository = new AuditEventRepository(jdbc);
+        long start = System.nanoTime();
+        var page = repository.query(0, 100, "LOGIN", "SUCCESS", "USER", 1L, null,
+                java.time.LocalDateTime.parse("2026-11-01T00:00:00"), java.time.LocalDateTime.parse("2026-11-02T00:00:00"));
+        assertEquals(100, page.content().size()); assertEquals(100, page.totalElements());
+        assertEquals(9901L, page.content().getFirst().targetId());
+        System.out.println("AUDIT_QUERY corpus=10000 page=100 elapsed_ms=" + (System.nanoTime() - start) / 1_000_000);
+        Files.writeString(Path.of("target/phase-9-query-plans.json"), mapper.writerWithDefaultPrettyPrinter().writeValueAsString(plans));
+    }
 }

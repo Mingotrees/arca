@@ -1,0 +1,27 @@
+# Phase 9 — Transaction-aware audit events
+
+## Approved direction
+User selected transaction-aware service recording, one-year retention, admin view/export through paginated API, and manual database-operator purge. No application update/delete/export-file endpoint, retrospective backfill or remote log service.
+
+## Approaches
+Transactional inserts are selected because events must describe committed mutations. Controller-only success logging cannot prove commit and was rejected. Separate best-effort security-result recording is used only for externally observed failures and generic recovery acceptance, never as the success path for mutations.
+
+## Storage and privacy
+V10 creates audit_events with generated bigint ID, nullable numeric actor_id, enumerated action/target_type/outcome, nullable numeric target_id, UTC occurred_at, safe correlation_id and JSON metadata. No actor FK: deleting users must not delete provenance. Actor snapshot is only the immutable numeric account ID. Audit API returns these fields only; no names/emails/IPs/URLs/paths/free-form input/error messages/secrets/content. Metadata contains only validated role identifier for role changes, otherwise an empty object. No application update/delete method or API; runtime database privileges must be SELECT/INSERT only for this table. Operator DELETE remains possible for retention. No privileged trigger migration.
+
+## Action matrix
+- Success in same transaction, fail closed on audit insert failure: LOGIN (session creation), PASSWORD_RESET (password/session revocation), ADMIN_CREATED, ROLE_ADDED/ROLE_REMOVED (including promote/demote), USER_DELETED, EMAIL_BANNED/EMAIL_UNBANNED (banned row ID, never address), POST_DELETED (logical post ID), POST_APPROVED/POST_REJECTED (version row ID), SCHOOL/DEPARTMENT/SUBJECT_CREATED/UPDATED/DELETED, AVATAR_CHANGED, COVER_CHANGED/COVER_REMOVED.
+- Repeated post delete and empty cover removal do not add success events. User deletion locks the active target so concurrent requests emit only one transition/event. Taxonomy delete first verifies existence; successful update commands may record unchanged submitted values. Request rollback removes successful audit events with mutation. Audit writes require an active transaction.
+- Separate best-effort new transaction, bounded to one event per HTTP request: failed login, failed reset, recovery request externally visible outcome, and 401/403 denials for allowlisted mutation/query routes. Use action LOGIN/PASSWORD_RESET/PASSWORD_RECOVERY or ACCESS_DENIED; no guessed numeric targets or submitted identity. Failure to audit must not change generic recovery/security responses; increment a failure metric and log only a static warning. Login/reset success is not duplicated by HTTP observation. Failed input/business mutations other than these security outcomes are not exhaustively audited.
+- Request correlation generated/validated for all /api/v1 routes. Both filters use MVC-compatible decoded PathPattern matching, including encoded prefixes. Observation security filter wraps JWT authentication and authorization, resolves validated principal ID before SecurityContext cleanup; never reads bodies. Service context resolves actor from authenticated UserPrincipal; login/reset explicitly use authenticated/proven token account ID. Missing request context gets a generated UUID.
+
+## Query contract
+GET /api/v1/admin/audit-events, ROLE_ADMIN at HTTP and service boundaries. Response content/page/size/total_elements/total_pages; stable occurred_at DESC,id DESC. Zero-based page 0 default, max 10000; size 20 default, max 100. Allowlisted action, outcome, target_type; positive actor_id/target_id optional; target_id requires target_type. Optional ISO offset from/to normalized UTC, inclusive/exclusive; default trailing 90 days, positive max 90-day duration, UTC years 1000–9999 and microsecond precision. Query uses parameter binding and separate page/count in repeatable-read read-only transaction. Same-window pages provide export; no snapshot across multiple HTTP calls promised. Index time/id, actor/time/id, action/time/id, target/time/id, outcome/time/id. One-year retention is 365 elapsed days, applied manually by DB operator with backup/export and bounded batches; no automatic purge.
+
+## Implementation refinements
+- Metadata permits only validated ASCII role identifier for ROLE_ADDED/ROLE_REMOVED, otherwise `{}`; this identifies the privilege changed without accepting arbitrary metadata.
+- Audit security observation wraps JWT validation (before JwtFilter), resolving the authenticated actor before security-context cleanup, so invalid-token early returns are included.
+- Successful taxonomy update commands are audited even when submitted values are unchanged; no-op exclusions specifically cover repeat post delete/empty cover removal.
+
+## Delivery
+Integration tests prove success/rollback/fail-closed behavior, anonymous redaction, audit outage behavior, action coverage, pagination/filter ordering, role authorization, absent mutation routes, encoded paths, concurrent user deletion, actor deletion survival and migration preservation. Database grant enforcement is a deployment verification responsibility. Focused unit tests updated only for added audit dependency. OpenAPI parity, MySQL corpus EXPLAIN, full Maven verify and independent read-only review. No commit/push without request. Existing successful API responses and JWT compatibility retained.

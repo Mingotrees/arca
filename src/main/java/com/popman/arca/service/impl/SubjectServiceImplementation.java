@@ -15,14 +15,16 @@ import java.util.stream.Collectors;
 
 @Service
 public class SubjectServiceImplementation implements SubjectService{
+    private final com.popman.arca.service.audit.AuditService audit;
 
     private final SubjectRepository subjectRepository;
     private final DepartmentRepository departmentRepository;
 
 
-    public SubjectServiceImplementation(SubjectRepository subjectRepository, DepartmentRepository departmentRepository) {
+    public SubjectServiceImplementation(SubjectRepository subjectRepository, DepartmentRepository departmentRepository, com.popman.arca.service.audit.AuditService audit) {
         this.subjectRepository = subjectRepository;
         this.departmentRepository = departmentRepository;
+        this.audit = audit;
     }
 
     @Override
@@ -56,7 +58,9 @@ public class SubjectServiceImplementation implements SubjectService{
             .collect(Collectors.toList());
 
         subject.setListDepartments(attachedDepartments);
-        return subjectRepository.save(subject);
+        Subject saved = subjectRepository.save(subject);
+        audit.success(com.popman.arca.service.audit.AuditAction.SUBJECT_CREATED, saved.getId());
+        return saved;
     }
 
     @Override
@@ -77,15 +81,18 @@ public class SubjectServiceImplementation implements SubjectService{
 
         existingSubject.setListDepartments(attachedDepartments);
 
+        audit.success(com.popman.arca.service.audit.AuditAction.SUBJECT_UPDATED, id);
         return subjectRepository.save(existingSubject);
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public void deleteSubjectV1(Long id) {
         if(!subjectRepository.existsById(id)){
             throw new RuntimeException("Subject not found by id: " + id);
         }
         subjectRepository.deleteById(id);
+        audit.success(com.popman.arca.service.audit.AuditAction.SUBJECT_DELETED, id);
     }
 
     @Override

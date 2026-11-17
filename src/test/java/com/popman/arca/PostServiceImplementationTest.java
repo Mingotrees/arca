@@ -56,6 +56,8 @@ class PostServiceImplementationTest {
     @InjectMocks
     private PostServiceImplementation postService;
 
+    @Mock private com.popman.arca.service.audit.AuditService audit;
+
     @Test
     void createUsesAuthenticatedActorAndReturnsBothIds() {
         User actor = new User();

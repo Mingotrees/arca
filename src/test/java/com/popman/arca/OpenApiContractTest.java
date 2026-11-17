@@ -69,6 +69,10 @@ class OpenApiContractTest {
                 checked.path("paths").path("/api/v1/user/{userId}/cover-picture"));
         assertEquals(0, generated.path("paths").path("/api/v1/user/{userId}/cover-picture").path("get").path("security").size());
         assertEquals(generated.at("/components/schemas/CoverPictureResponse"), checked.at("/components/schemas/CoverPictureResponse"));
+        assertFalse(generated.path("paths").path("/api/v1/admin/audit-events").isMissingNode());
+        assertEquals(generated.path("paths").path("/api/v1/admin/audit-events"), checked.path("paths").path("/api/v1/admin/audit-events"));
+        for (String schema : new String[]{"AuditEventResponse", "AuditEventPage"})
+            assertEquals(generated.path("components").path("schemas").path(schema), checked.path("components").path("schemas").path(schema), "Audit schema drift: " + schema);
         assertFalse(generated.path("paths").path("/api/v1/admin/dashboard").isMissingNode());
         assertEquals(generated.path("paths").path("/api/v1/admin/dashboard"), checked.path("paths").path("/api/v1/admin/dashboard"));
         for (String schema : new String[]{"AdminDashboardResponse", "Users", "Posts", "Moderation", "Engagement"}) {

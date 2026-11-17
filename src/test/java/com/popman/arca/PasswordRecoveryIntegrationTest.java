@@ -57,7 +57,7 @@ class PasswordRecoveryIntegrationTest {
     @BeforeEach
     void seed() {
         mail.clear(); clock.reset();
-        for (String table : new String[]{"password_reset_tokens", "password_recovery_rate_limits", "files", "votes", "vaults", "post_tags",
+        for (String table : new String[]{"audit_events", "password_reset_tokens", "password_recovery_rate_limits", "files", "votes", "vaults", "post_tags",
                 "posts", "post_identities", "user_roles", "refresh_tokens", "department_subjects", "subject_aliases", "subjects", "departments", "school", "banned_emails", "users"}) {
             jdbc.update("DELETE FROM " + table);
         }
@@ -95,6 +95,9 @@ class PasswordRecoveryIntegrationTest {
         assertFalse(generic.contains(token));
         assertFalse(output.getAll().contains(token));
         assertNull(mail.deliveries.poll(200, TimeUnit.MILLISECONDS));
+        assertEquals(4, count("audit_events WHERE action='PASSWORD_RECOVERY' AND outcome='ACCEPTED' AND actor_id IS NULL AND target_id IS NULL"));
+        String events = jdbc.queryForList("SELECT * FROM audit_events").toString();
+        assertFalse(events.contains(token)); assertFalse(events.contains("owner@example.test"));
     }
 
     @Test
@@ -113,6 +116,22 @@ class PasswordRecoveryIntegrationTest {
         postJson("/api/v1/auth/refresh", Map.of("refresh_token", first.path("refresh_token").asText()), 401);
         mvc.perform(get("/api/v1/user/me").header("Authorization", "Bearer " + first.path("access_token").asText())).andExpect(status().isOk());
         reset(token, "AnotherPassword3!", 400);
+        assertEquals(1, count("audit_events WHERE action='PASSWORD_RESET' AND outcome='SUCCESS' AND actor_id=1 AND target_id=1"));
+        assertEquals(3, count("audit_events WHERE action='LOGIN' AND outcome='SUCCESS' AND actor_id=1"));
+    }
+
+    @Test
+    void missingAuditStorageRollsBackResetButKeepsRecoveryResponseGeneric() throws Exception {
+        login(OLD);
+        String token = issue();
+        jdbc.execute("RENAME TABLE audit_events TO audit_events_unavailable");
+        try {
+            reset(token, NEW, 500);
+            assertEquals(oldHash, jdbc.queryForObject("SELECT password FROM users WHERE id=1", String.class));
+            assertEquals(0, count("password_reset_tokens WHERE used_at IS NOT NULL"));
+            assertEquals(1, count("refresh_tokens"));
+            recover("missing@example.test");
+        } finally { jdbc.execute("RENAME TABLE audit_events_unavailable TO audit_events"); }
     }
 
     @Test

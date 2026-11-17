@@ -14,6 +14,74 @@ servers:
 - url: http://localhost:20255
   description: Local development
 paths:
+  /api/v1/admin/audit-events:
+    get:
+      tags: [admin-audit-controller]
+      summary: Read audit events
+      description: "Admin-only paged export/query. Stable occurred_at DESC,id DESC. Page 0–10000, size 1–100 (defaults 0/20). Exact allowlisted action/outcome/target_type and positive actor_id/target_id filters; target_id requires target_type. UTC [from,to), positive maximum 90 days, default trailing 90 days, offsets accepted, microsecond precision, years 1000–9999. Numeric actor/target IDs survive deletion; metadata contains only validated role for role changes, otherwise an empty object. No credentials, addresses, content or file paths. Events begin at deployment; one-year retention is manually managed by database operator. No update/delete API or cross-request export snapshot."
+      operationId: query
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema: {type: integer, format: int32, minimum: 0, maximum: 10000}
+      - name: size
+        in: query
+        required: false
+        schema: {type: integer, format: int32, minimum: 1, maximum: 100}
+      - name: action
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [LOGIN, PASSWORD_RESET, PASSWORD_RECOVERY, ACCESS_DENIED, ADMIN_CREATED, ROLE_ADDED, ROLE_REMOVED, USER_DELETED, EMAIL_BANNED, EMAIL_UNBANNED, POST_DELETED, POST_APPROVED, POST_REJECTED, SCHOOL_CREATED, SCHOOL_UPDATED, SCHOOL_DELETED, DEPARTMENT_CREATED, DEPARTMENT_UPDATED, DEPARTMENT_DELETED, SUBJECT_CREATED, SUBJECT_UPDATED, SUBJECT_DELETED, AVATAR_CHANGED, COVER_CHANGED, COVER_REMOVED]
+      - name: outcome
+        in: query
+        required: false
+        schema: {type: string, enum: [SUCCESS, DENIED, ERROR, ACCEPTED]}
+      - name: target_type
+        in: query
+        required: false
+        schema: {type: string, enum: [USER, SECURITY, BANNED_EMAIL, POST, POST_VERSION, SCHOOL, DEPARTMENT, SUBJECT]}
+      - name: actor_id
+        in: query
+        required: false
+        schema: {type: integer, format: int64, minimum: 1}
+      - name: target_id
+        in: query
+        required: false
+        schema: {type: integer, format: int64, minimum: 1}
+      - name: from
+        in: query
+        required: false
+        schema: {type: string, format: date-time}
+      - name: to
+        in: query
+        required: false
+        schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: Audit page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuditEventPage'}
+        '400':
+          description: Invalid bounds or filters
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiErrorResponse'}
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiErrorResponse'}
+        '403':
+          description: Admin required
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiErrorResponse'}
+      security:
+      - bearerAuth: []
   /api/v1/admin/dashboard:
     get:
       tags: [admin-dashboard-controller]
@@ -1888,6 +1956,30 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    AuditEventPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items: {$ref: '#/components/schemas/AuditEventResponse'}
+        page: {type: integer, format: int32}
+        size: {type: integer, format: int32}
+        total_elements: {type: integer, format: int64}
+        total_pages: {type: integer, format: int64}
+    AuditEventResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        actor_id: {type: [integer, 'null'], format: int64}
+        action: {type: string}
+        target_type: {type: string}
+        target_id: {type: [integer, 'null'], format: int64}
+        outcome: {type: string}
+        occurred_at: {type: string, format: date-time}
+        correlation_id: {type: string}
+        metadata:
+          type: object
+          additionalProperties: {}
     AdminDashboardResponse:
       type: object
       properties:

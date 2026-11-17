@@ -5,6 +5,8 @@ import com.popman.arca.dto.v1.user.UserUpdateRequest;
 import com.popman.arca.entity.User;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.UserService;
+import com.popman.arca.service.audit.AuditService;
+import static com.popman.arca.service.audit.AuditAction.*;
 import com.popman.arca.service.media.UploadValidator;
 import com.popman.arca.service.media.MediaStorage;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -35,15 +37,17 @@ public class UserServiceImplementation implements UserService {
   private static final Logger logger = LoggerFactory.getLogger(UserServiceImplementation.class);
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
+  private final AuditService audit;
   private final UploadValidator uploadValidator = new UploadValidator();
   private final MediaStorage mediaStorage = new MediaStorage();
 
   @Value("${file.upload-dir:uploads}")
   private String uploadDir;
 
-  public UserServiceImplementation(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+  public UserServiceImplementation(UserRepository userRepository, PasswordEncoder passwordEncoder, AuditService audit) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
+    this.audit = audit;
   }
 
   @Override
@@ -134,6 +138,7 @@ public class UserServiceImplementation implements UserService {
       User savedUser = userRepository.save(user);
       logger.info("Admin created successfully with ID: {} and roles: {}",
           savedUser.getId(), savedUser.getRoles());
+      audit.success(ADMIN_CREATED, savedUser.getId());
 
       return "Admin created successfully with ID: " + savedUser.getId();
     } catch (IllegalArgumentException e) {
@@ -161,6 +166,7 @@ public class UserServiceImplementation implements UserService {
 
       user.addRole("ROLE_ADMIN");
       userRepository.save(user);
+      audit.roleChanged(ROLE_ADDED, userId, "ROLE_ADMIN");
 
       logger.info("User {} promoted to admin successfully", userId);
       return "User promoted to admin successfully";
@@ -193,6 +199,7 @@ public class UserServiceImplementation implements UserService {
 
       user.removeRole("ROLE_ADMIN");
       userRepository.save(user);
+      audit.roleChanged(ROLE_REMOVED, userId, "ROLE_ADMIN");
 
       logger.info("User {} demoted from admin successfully", userId);
       return "User demoted from admin successfully";
@@ -222,6 +229,7 @@ public class UserServiceImplementation implements UserService {
 
       user.addRole(role);
       userRepository.save(user);
+      audit.roleChanged(ROLE_ADDED, userId, role);
 
       logger.info("Role {} added to user {} successfully", role, userId);
       return "Role added successfully";
@@ -255,6 +263,7 @@ public class UserServiceImplementation implements UserService {
 
       user.removeRole(role);
       userRepository.save(user);
+      audit.roleChanged(ROLE_REMOVED, userId, role);
 
       logger.info("Role {} removed from user {} successfully", role, userId);
       return "Role removed successfully";
@@ -305,6 +314,7 @@ public class UserServiceImplementation implements UserService {
       if (cover) user.setCoverPicture(relativePath);
       else user.setProfilePicture(relativePath);
       userRepository.saveAndFlush(user);
+      audit.success(cover ? COVER_CHANGED : AVATAR_CHANGED, userId);
       if (!synchronizedTransaction) deleteOldPicture(oldPath, directory);
       return relativePath;
     } catch (IOException e) {
@@ -333,8 +343,10 @@ public class UserServiceImplementation implements UserService {
     User user = userRepository.findByIdForUpdate(userId)
         .orElseThrow(() -> new NoSuchElementException("User not found"));
     String oldPath = user.getCoverPicture();
+    if (oldPath == null) return;
     user.setCoverPicture(null);
     userRepository.saveAndFlush(user);
+    audit.success(COVER_REMOVED, userId);
     if (TransactionSynchronizationManager.isSynchronizationActive()) {
       TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
         @Override public void afterCommit() { deleteOldPicture(oldPath, "cover-pictures"); }
@@ -411,11 +423,10 @@ public class UserServiceImplementation implements UserService {
       logger.debug("Deleting user with Id: {}", userId);
       validateId(userId);
 
-      if (!userRepository.existsById(userId)) {
-        throw new IllegalArgumentException("User does not exist or is already deleted");
-      }
-
-      userRepository.deleteById(userId);
+      User user = userRepository.findByIdForUpdate(userId)
+          .orElseThrow(() -> new IllegalArgumentException("User does not exist or is already deleted"));
+      userRepository.delete(user);
+      audit.success(USER_DELETED, userId);
       logger.info("User with ID {} deleted successfully (soft delete)", userId);
       return "User deleted successfully";
 

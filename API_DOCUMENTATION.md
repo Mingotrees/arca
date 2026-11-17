@@ -10961,6 +10961,10 @@ This operation does not require authentication
 |files|[[FileResponse](#schemafileresponse)]|false|none|none|
 |isLatestVersion|boolean|false|none|none|
 |latestVersion|boolean|false|none|none|
+# Phase 9 contract update
+
+Admin-only `GET /api/v1/admin/audit-events` provides stable newest-first filtered pages (`content`, `page`, `size`, `total_elements`, `total_pages`). Supports bounded page/size, action/outcome/target_type, actor_id/target_id, UTC offset from/to windows <=90 days. Records retain numeric actor/target provenance with minimal allowlisted role metadata; successful mutations commit atomically with their events, while externally observed security failures use an independent best-effort path. One-year retention is manual database-operator work; no application update/delete API. See [Phase 9 operations](docs/phase-9-operations.md) for action coverage, privacy, export limitations, runtime grants and V10 rollout; [openapi.yaml](openapi.yaml) is the wire contract.
+
 # Phase 8 contract update
 
 Admin-only `GET /api/v1/admin/dashboard` returns `calculated_at`, UTC effective `from`/`to`, and aggregate `users`, `posts`, `moderation`, `engagement` groups. Optional ISO offset date-times define a positive `[from,to)` period of at most 90 days, default trailing 90 days; precision at most microseconds. Current totals stay all-time. Approval activity counts version-specific UTC `approved_at`, retained after superseding/deletion; legacy approval dates remain null and counted separately as unknown. V9 adds the nullable column. See [Phase 8 operations](docs/phase-8-operations.md) for exact status/eligibility/size semantics, clock limitations, queries and rollout, and [openapi.yaml](openapi.yaml) for schemas and JSON 400/401/403 errors.
