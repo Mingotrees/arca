@@ -10961,6 +10961,10 @@ This operation does not require authentication
 |files|[[FileResponse](#schemafileresponse)]|false|none|none|
 |isLatestVersion|boolean|false|none|none|
 |latestVersion|boolean|false|none|none|
+# Phase 8 contract update
+
+Admin-only `GET /api/v1/admin/dashboard` returns `calculated_at`, UTC effective `from`/`to`, and aggregate `users`, `posts`, `moderation`, `engagement` groups. Optional ISO offset date-times define a positive `[from,to)` period of at most 90 days, default trailing 90 days; precision at most microseconds. Current totals stay all-time. Approval activity counts version-specific UTC `approved_at`, retained after superseding/deletion; legacy approval dates remain null and counted separately as unknown. V9 adds the nullable column. See [Phase 8 operations](docs/phase-8-operations.md) for exact status/eligibility/size semantics, clock limitations, queries and rollout, and [openapi.yaml](openapi.yaml) for schemas and JSON 400/401/403 errors.
+
 # Phase 7 contract update
 
 Post create/update accepts optional ordered `links` (`url`, optional `label`), maximum 10. Only valid absolute HTTP(S) URLs without credentials are accepted; canonical duplicates and invalid/overlong links return 400 atomically. Omitted/null update copies source-version links; `[]` clears links only in the new version. Read/list/search/history `PostResponse` adds `links` (`url`, `label`, zero-based `position`), defaulting to `[]`. Parent visibility/deletion applies unchanged; backend never fetches submitted destinations. See [Phase 7 operations](docs/phase-7-operations.md) and [openapi.yaml](openapi.yaml) for exact limits, normalization, version semantics and V8 rollout.
