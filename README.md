@@ -24,7 +24,7 @@ Arca is a REST API for sharing academic posts and attachments, organized by scho
 - **Post discovery** — full-text title/content search, combined subject/department/author/date filters, deterministic sorts, and bounded pagination through `/api/v1/posts/search`.
 - **Resource sharing** — JPEG, PNG, and PDF post attachments, authenticated downloads, upvotes/downvotes, and labeled vault entries.
 - **Resource security** — shared post visibility checks, bounded content-validated uploads, canonical storage containment, transactional avatar replacement, and startup JWT/CORS validation.
-- **Administration** — account and role management, user soft deletion, banned-email controls, and admin-only dashboard aggregates with UTC reporting windows.
+- **Administration** — account and role management, user soft deletion, banned-email controls, admin-only dashboard aggregates, and transaction-aware audit history.
 - **Operational tooling** — Flyway migrations, OpenAPI documentation, MySQL-backed integration tests, correlated deletion logs, and admin-only health/metrics endpoints.
 
 Built with **Java 21**, **Spring Boot 3.5.5**, **Spring MVC**, **Spring Data JPA**, **Spring Security**, and **MySQL 8.4**. The application connects using the MariaDB JDBC driver.
@@ -76,7 +76,7 @@ docker compose -p arca up -d --wait mysql
 ./mvnw spring-boot:run
 ```
 
-Compose starts **only MySQL**, bound to `127.0.0.1:3306`, with a persistent database volume. The application loads `.env` from the repository root and defaults to the `dev` profile. On an empty database, Flyway applies V1–V9 before Hibernate validates the schema.
+Compose starts **only MySQL**, bound to `127.0.0.1:3306`, with a persistent database volume. The application loads `.env` from the repository root and defaults to the `dev` profile. On an empty database, Flyway applies V1–V10 before Hibernate validates the schema.
 
 | Service | Local URL |
 | --- | --- |
@@ -123,6 +123,7 @@ Most `/api/v1` routes require `Authorization: Bearer <access_token>`. Authentica
 | Posts | `/api/v1/posts`, `/mine`, `/subject/{subjectId}`, `/department/{departmentId}`, `/user/{userId}` under the posts prefix |
 | Post links | Optional ordered `links` on post create/update; version-owned responses, HTTP(S)-only, no server-side fetching. [Contract and V8 rollout](docs/phase-7-operations.md) |
 | Admin dashboard | `GET /api/v1/admin/dashboard`: current aggregates and bounded UTC creation/approval activity. [Definitions and V9 rollout](docs/phase-8-operations.md) |
+| Audit events | `GET /api/v1/admin/audit-events`: admin-only filtered paging/export, transactional mutation records. [Action matrix, V10, retention and grants](docs/phase-9-operations.md) |
 | Search | `/api/v1/posts/search` — combined filters and stable paged results; legacy lists remain arrays |
 | Moderation and history | `/api/v1/posts/pending`, `/api/v1/posts/{postId}/approve`, `/api/v1/posts/history/{postId}` |
 | Attachments | `/api/v1/files/upload`, `/api/v1/files/{id}`, `/api/v1/files/download/{id}` |

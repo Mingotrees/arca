@@ -55,7 +55,7 @@ public class SecurityConfig {
   private List<String> allowedHeaders;
 
   @Bean
-  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+  public SecurityFilterChain filterChain(HttpSecurity http, com.popman.arca.filter.AuditSecurityFilter auditFilter) throws Exception {
     return http
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .csrf(csrf -> csrf.disable())
@@ -106,7 +106,22 @@ public class SecurityConfig {
             .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authenticationProvider(authenticationProvider())
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(auditFilter, JwtFilter.class)
         .build();
+  }
+
+  @Bean
+  public com.popman.arca.filter.AuditSecurityFilter auditSecurityFilter(
+      com.popman.arca.service.audit.SecurityAuditWriter writer, io.micrometer.core.instrument.MeterRegistry meters) {
+    return new com.popman.arca.filter.AuditSecurityFilter(writer, meters);
+  }
+
+  @Bean
+  public org.springframework.boot.web.servlet.FilterRegistrationBean<com.popman.arca.filter.AuditSecurityFilter> auditFilterRegistration(
+      com.popman.arca.filter.AuditSecurityFilter filter) {
+    var registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>(filter);
+    registration.setEnabled(false); // Security chain only, never duplicate servlet registration.
+    return registration;
   }
 
   @Bean

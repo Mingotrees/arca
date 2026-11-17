@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 public class PostServiceImplementation implements PostService {
 
     private final PostAccessPolicy accessPolicy = new PostAccessPolicy();
+    @Autowired private com.popman.arca.service.audit.AuditService audit;
     private final com.popman.arca.service.links.PostLinkValidator linkValidator = new com.popman.arca.service.links.PostLinkValidator();
 
     @Autowired
@@ -291,6 +292,7 @@ public class PostServiceImplementation implements PostService {
             post.setUpdatedAt(LocalDateTime.now());
             postRepository.save(post);
 
+            audit.success(com.popman.arca.service.audit.AuditAction.POST_APPROVED, post.getId());
             return "Post approved successfully. Now visible to users.";
 
         } else {
@@ -314,6 +316,7 @@ public class PostServiceImplementation implements PostService {
             post.setUpdatedAt(LocalDateTime.now());
             postRepository.save(post);
 
+            audit.success(com.popman.arca.service.audit.AuditAction.POST_REJECTED, post.getId());
             return "Post rejected. " +
                     (approvalRequest.getRejectionReason() != null ?
                             "Reason: " + approvalRequest.getRejectionReason() : "No reason given");
@@ -339,7 +342,9 @@ public class PostServiceImplementation implements PostService {
         Post post = postRepository.findByIdForUpdate(rowId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
         accessPolicy.requireDeletable(post, actorId, isAdmin);
+        if (post.isDeleted()) return;
         postRepository.softDeleteLogicalPost(post.getPost_id(), actorId, LocalDateTime.now());
+        audit.success(com.popman.arca.service.audit.AuditAction.POST_DELETED, post.getPost_id().longValue());
     }
 
     @Override

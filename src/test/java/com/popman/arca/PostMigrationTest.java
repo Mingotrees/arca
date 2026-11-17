@@ -16,7 +16,7 @@ class PostMigrationTest {
         try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
             db.start();
             Flyway flyway = flyway(db);
-            assertEquals(9, flyway.migrate().migrationsExecuted);
+            assertEquals(10, flyway.migrate().migrationsExecuted);
             assertEquals(0, flyway.migrate().migrationsExecuted);
             JdbcTemplate jdbc = jdbc(db);
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM posts", Integer.class));
@@ -49,7 +49,7 @@ class PostMigrationTest {
             assertThrows(Exception.class, () -> flyway(db).migrate());
             Flyway baseline = flyway(db);
             baseline.baseline();
-            assertEquals(8, baseline.migrate().migrationsExecuted);
+            assertEquals(9, baseline.migrate().migrationsExecuted);
             assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM posts WHERE post_id=7 "
                     + "AND is_deleted=false AND deleted_at IS NULL AND deleted_by IS NULL", Integer.class));
             assertEquals(1L, jdbc.queryForObject("SELECT owner_id FROM post_identities WHERE id=7", Long.class));
@@ -227,10 +227,30 @@ class PostMigrationTest {
                     + "VALUES(1,1,1,'Old','Body','SUPERSEDED',1,1,false,'2026-01-01','2026-01-02'),"
                     + "(2,1,2,'New','Body','APPROVED',1,1,true,'2026-01-03','2026-01-04')");
             var before = jdbc.queryForList("SELECT * FROM posts ORDER BY id");
-            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            Flyway approvalMigration = Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("9").load();
+            assertEquals(1, approvalMigration.migrate().migrationsExecuted);
             var after = jdbc.queryForList("SELECT * FROM posts ORDER BY id");
             after.forEach(row -> assertNull(row.remove("approved_at")));
             assertEquals(before, after);
+            assertEquals(0, approvalMigration.migrate().migrationsExecuted);
+        }
+    }
+
+    @Test
+    void upgradesV9WithEmptyAuditTrailAndRetainsNumericActorsAfterPhysicalAccountRemoval() {
+        try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
+            db.start();
+            Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("9").load().migrate();
+            JdbcTemplate jdbc = jdbc(db);
+            jdbc.update("INSERT INTO users(id,email,password) VALUES(1,'retained@example.test','retained-hash')");
+            jdbc.update("INSERT INTO refresh_tokens(user_id,token,expiry_date) VALUES(1,'retained-session','2027-01-01')");
+            var before = jdbc.queryForList("SELECT * FROM refresh_tokens");
+            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            assertEquals(before, jdbc.queryForList("SELECT * FROM refresh_tokens"));
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events", Integer.class));
+            jdbc.update("INSERT INTO audit_events(actor_id,action,target_type,target_id,outcome,occurred_at,correlation_id,metadata) VALUES(1,'USER_DELETED','USER',1,'SUCCESS',UTC_TIMESTAMP(6),'migration','{}')");
+            jdbc.update("DELETE FROM refresh_tokens"); jdbc.update("DELETE FROM users WHERE id=1");
+            assertEquals(1L, jdbc.queryForObject("SELECT actor_id FROM audit_events", Long.class));
             assertEquals(0, flyway(db).migrate().migrationsExecuted);
         }
     }

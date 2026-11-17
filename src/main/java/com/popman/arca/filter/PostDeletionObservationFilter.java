@@ -47,8 +47,8 @@ public class PostDeletionObservationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String submitted = request.getHeader("X-Request-ID");
-        String correlation = submitted != null && SAFE_CORRELATION.matcher(submitted).matches()
-                ? submitted : UUID.randomUUID().toString();
+        String correlation = MDC.get("correlation_id") != null ? MDC.get("correlation_id")
+                : submitted != null && SAFE_CORRELATION.matcher(submitted).matches() ? submitted : UUID.randomUUID().toString();
         String previous = MDC.get("correlation_id");
         MDC.put("correlation_id", correlation);
         response.setHeader("X-Request-ID", correlation);

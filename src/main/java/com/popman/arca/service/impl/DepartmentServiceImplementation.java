@@ -14,13 +14,15 @@ import java.util.stream.Collectors;
 
 @Service
 public class DepartmentServiceImplementation implements DepartmentService {
+    private final com.popman.arca.service.audit.AuditService audit;
 
     private final DepartmentRepository departmentRepository;
     private final SchoolRepository schoolRepository;
 
-    public DepartmentServiceImplementation(DepartmentRepository departmentRepository, SchoolRepository schoolRepository) {
+    public DepartmentServiceImplementation(DepartmentRepository departmentRepository, SchoolRepository schoolRepository, com.popman.arca.service.audit.AuditService audit) {
         this.departmentRepository = departmentRepository;
         this.schoolRepository = schoolRepository;
+        this.audit = audit;
     }
 
     @Override
@@ -39,6 +41,7 @@ public class DepartmentServiceImplementation implements DepartmentService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public DepartmentDetailResponse createDepartmentV1(DepartmentRequest departmentRequest) {
         School school = schoolRepository.findById(departmentRequest.getSchoolId())
                 .orElseThrow(() -> new RuntimeException("School not found with ID: " + departmentRequest.getSchoolId()));
@@ -48,10 +51,12 @@ public class DepartmentServiceImplementation implements DepartmentService {
         department.setSchool(school);
 
         Department saved = departmentRepository.save(department);
+        audit.success(com.popman.arca.service.audit.AuditAction.DEPARTMENT_CREATED, saved.getId());
         return mapToDepartmentDetailResponse(saved);
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public DepartmentDetailResponse updateDepartmentV1(Long id, DepartmentRequest departmentRequest) {
         Department department = departmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Department not found with ID: " + id));
@@ -66,12 +71,16 @@ public class DepartmentServiceImplementation implements DepartmentService {
         }
 
         Department updated = departmentRepository.save(department);
+        audit.success(com.popman.arca.service.audit.AuditAction.DEPARTMENT_UPDATED, id);
         return mapToDepartmentDetailResponse(updated);
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public void deleteDepartmentV1(Long departmentId) {
+        if (!departmentRepository.existsById(departmentId)) throw new java.util.NoSuchElementException("Department not found");
         departmentRepository.deleteById(departmentId);
+        audit.success(com.popman.arca.service.audit.AuditAction.DEPARTMENT_DELETED, departmentId);
     }
 
     private DepartmentDetailResponse mapToDepartmentDetailResponse(Department department) {

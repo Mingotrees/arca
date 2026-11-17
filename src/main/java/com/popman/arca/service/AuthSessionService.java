@@ -17,10 +17,13 @@ public class AuthSessionService {
     private final JWTService jwt;
     private final AuthenticationManager authentication;
     private final BannedEmailService banned;
+    private final com.popman.arca.service.audit.AuditService audit;
     public AuthSessionService(UserRepository users, RefreshTokenRepository sessions, RefreshTokenService refresh,
-                              JWTService jwt, AuthenticationManager authentication, BannedEmailService banned) {
+                              JWTService jwt, AuthenticationManager authentication, BannedEmailService banned,
+                              com.popman.arca.service.audit.AuditService audit) {
         this.users = users; this.sessions = sessions; this.refresh = refresh; this.jwt = jwt;
         this.authentication = authentication; this.banned = banned;
+        this.audit = audit;
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -30,6 +33,7 @@ public class AuthSessionService {
         var result = authentication.authenticate(new UsernamePasswordAuthenticationToken(email, password));
         if (user == null || !result.isAuthenticated()) throw new BadCredentialsException("Invalid email or password");
         var session = refresh.createRefreshToken(user.getEmail());
+        audit.success(com.popman.arca.service.audit.AuditAction.LOGIN, user.getId(), user.getId());
         return new AuthResponse(jwt.generateToken(user.getEmail()), session.getToken(), user.getEmail());
     }
 

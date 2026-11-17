@@ -38,6 +38,8 @@ class UserServiceImplementationTest {
     @InjectMocks
     private UserServiceImplementation userService;
 
+    @Mock private com.popman.arca.service.audit.AuditService audit;
+
     @TempDir
     private Path uploadDir;
 

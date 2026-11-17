@@ -28,12 +28,14 @@ public class PasswordRecoveryService {
     private final RecoveryMailDispatcher mail;
     private final Clock clock;
     private final TransactionTemplate transaction;
+    private final com.popman.arca.service.audit.AuditService audit;
 
     public PasswordRecoveryService(PasswordRecoveryProperties settings, UserRepository users, PasswordResetTokenRepository tokens,
             BannedEmailService banned, PasswordEncoder passwords, RecoveryRateLimiter rates, RecoveryMailDispatcher mail,
-            Clock clock, PlatformTransactionManager manager) {
+            Clock clock, PlatformTransactionManager manager, com.popman.arca.service.audit.AuditService audit) {
         this.settings = settings; this.users = users; this.tokens = tokens; this.banned = banned;
         this.passwords = passwords; this.rates = rates; this.mail = mail; this.clock = clock;
+        this.audit = audit;
         transaction = new TransactionTemplate(manager); transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
     }
 
@@ -74,6 +76,7 @@ public class PasswordRecoveryService {
             user.setPassword(passwords.encode(password)); users.saveAndFlush(user);
             tokens.revokeUnused(user.getId(), now);
             tokens.deleteRefreshSessions(user.getId());
+            audit.success(com.popman.arca.service.audit.AuditAction.PASSWORD_RESET, user.getId(), user.getId());
         });
     }
 
