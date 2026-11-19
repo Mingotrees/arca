@@ -30,12 +30,19 @@ class OpenApiContractTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         if (Boolean.getBoolean("arca.openapi.export")) {
             Files.writeString(Path.of("target/openapi-generated.json"), generated.toPrettyString());
+            Files.writeString(Path.of("target/openapi-generated.yaml"), new Yaml().dump(mapper.convertValue(generated, java.util.Map.class)));
         }
         JsonNode checked;
         try (var stream = Files.newInputStream(Path.of("openapi.yaml"))) {
             checked = mapper.valueToTree(new Yaml().load(stream));
         }
         JsonNode deletion = generated.at("/paths/~1api~1v1~1posts~1{rowId}/delete");
+        for (String path : new String[]{"/api/v1/admin/announcements", "/api/v1/admin/announcements/{id}", "/api/v1/announcements/active", "/api/v1/posts/trending"}) {
+            assertFalse(generated.path("paths").path(path).isMissingNode());
+            assertEquals(generated.path("paths").path(path), checked.path("paths").path(path), "Homepage operation drift: " + path);
+        }
+        for (String schema : new String[]{"AnnouncementRequest", "AnnouncementResponse", "AdminAnnouncementResponse", "AnnouncementPage", "TrendingResponse", "TrendingPostResponse"})
+            assertEquals(generated.path("components").path("schemas").path(schema), checked.path("components").path("schemas").path(schema), "Homepage schema drift: " + schema);
         assertEquals(Set.of("204", "401", "403", "404"), names(deletion.path("responses")));
         assertFalse(deletion.path("responses").path("204").has("content"));
         assertEquals(checked.at("/paths/~1api~1v1~1posts~1{rowId}/delete"), deletion);

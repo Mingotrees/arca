@@ -16,7 +16,7 @@ class PostMigrationTest {
         try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
             db.start();
             Flyway flyway = flyway(db);
-            assertEquals(10, flyway.migrate().migrationsExecuted);
+            assertEquals(11, flyway.migrate().migrationsExecuted);
             assertEquals(0, flyway.migrate().migrationsExecuted);
             JdbcTemplate jdbc = jdbc(db);
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM posts", Integer.class));
@@ -49,7 +49,7 @@ class PostMigrationTest {
             assertThrows(Exception.class, () -> flyway(db).migrate());
             Flyway baseline = flyway(db);
             baseline.baseline();
-            assertEquals(9, baseline.migrate().migrationsExecuted);
+            assertEquals(10, baseline.migrate().migrationsExecuted);
             assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM posts WHERE post_id=7 "
                     + "AND is_deleted=false AND deleted_at IS NULL AND deleted_by IS NULL", Integer.class));
             assertEquals(1L, jdbc.queryForObject("SELECT owner_id FROM post_identities WHERE id=7", Long.class));
@@ -245,12 +245,34 @@ class PostMigrationTest {
             jdbc.update("INSERT INTO users(id,email,password) VALUES(1,'retained@example.test','retained-hash')");
             jdbc.update("INSERT INTO refresh_tokens(user_id,token,expiry_date) VALUES(1,'retained-session','2027-01-01')");
             var before = jdbc.queryForList("SELECT * FROM refresh_tokens");
-            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            Flyway auditMigration = Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("10").load();
+            assertEquals(1, auditMigration.migrate().migrationsExecuted);
             assertEquals(before, jdbc.queryForList("SELECT * FROM refresh_tokens"));
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events", Integer.class));
             jdbc.update("INSERT INTO audit_events(actor_id,action,target_type,target_id,outcome,occurred_at,correlation_id,metadata) VALUES(1,'USER_DELETED','USER',1,'SUCCESS',UTC_TIMESTAMP(6),'migration','{}')");
             jdbc.update("DELETE FROM refresh_tokens"); jdbc.update("DELETE FROM users WHERE id=1");
             assertEquals(1L, jdbc.queryForObject("SELECT actor_id FROM audit_events", Long.class));
+            assertEquals(0, auditMigration.migrate().migrationsExecuted);
+        }
+    }
+
+    @Test
+    void upgradesV10PreservingLegacyVotesWithoutInventingEngagementDates() {
+        try (MySQLContainer<?> db = new MySQLContainer<>("mysql:8.4")) {
+            db.start();
+            Flyway.configure().dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()).target("10").load().migrate();
+            JdbcTemplate jdbc = jdbc(db);
+            jdbc.update("INSERT INTO users(id,email) VALUES(1,'retained@example.test')");
+            jdbc.update("INSERT INTO school(id,name) VALUES(1,'School')");
+            jdbc.update("INSERT INTO departments(id,name,school_id) VALUES(1,'Department',1)");
+            jdbc.update("INSERT INTO post_identities(id,owner_id) VALUES(1,1)");
+            jdbc.update("INSERT INTO posts(id,post_id,version,title,content,status,user_id,department_id,is_latest_version,created_at,updated_at) VALUES(1,1,1,'Old','Body','APPROVED',1,1,true,'2026-01-01','2026-01-01')");
+            jdbc.update("INSERT INTO votes(post_id,user_id,vote_type) VALUES(1,1,'UPVOTE')");
+            var before = jdbc.queryForMap("SELECT * FROM votes");
+            assertEquals(1, flyway(db).migrate().migrationsExecuted);
+            var after = jdbc.queryForMap("SELECT * FROM votes"); assertNull(after.remove("changed_at")); assertEquals(before, after);
+            assertNull(jdbc.queryForObject("SELECT approved_at FROM posts", java.time.LocalDateTime.class));
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM announcements", Integer.class));
             assertEquals(0, flyway(db).migrate().migrationsExecuted);
         }
     }

@@ -61,6 +61,7 @@ public class VoteServiceImplementation implements VoteService {
         vote.setPost(post);
         vote.setUser(user);
         vote.setVoteType(request.getVoteType());
+        vote.setChangedAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
 
         Vote savedVote = voteRepository.save(vote);
 
