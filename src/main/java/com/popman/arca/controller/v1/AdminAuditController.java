@@ -33,7 +33,7 @@ public class AdminAuditController {
             @Parameter(schema = @Schema(type = "integer", format = "int32", minimum = "1", maximum = "100")) @RequestParam(required = false) Integer size,
             @RequestParam(required = false) com.popman.arca.service.audit.AuditAction action,
             @Parameter(schema = @Schema(allowableValues = {"SUCCESS", "DENIED", "ERROR", "ACCEPTED"})) @RequestParam(required = false) String outcome,
-            @Parameter(schema = @Schema(allowableValues = {"USER", "SECURITY", "BANNED_EMAIL", "POST", "POST_VERSION", "SCHOOL", "DEPARTMENT", "SUBJECT"})) @RequestParam(name = "target_type", required = false) String targetType,
+            @Parameter(schema = @Schema(allowableValues = {"USER", "SECURITY", "BANNED_EMAIL", "POST", "POST_VERSION", "SCHOOL", "DEPARTMENT", "SUBJECT", "ANNOUNCEMENT"})) @RequestParam(name = "target_type", required = false) String targetType,
             @Parameter(schema = @Schema(type = "integer", format = "int64", minimum = "1")) @RequestParam(name = "actor_id", required = false) Long actorId,
             @Parameter(schema = @Schema(type = "integer", format = "int64", minimum = "1")) @RequestParam(name = "target_id", required = false) Long targetId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,

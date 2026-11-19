@@ -24,6 +24,11 @@ public class Vote {
     @Column(nullable = false)
     private String voteType;
 
+    @Column(name = "changed_at")
+    private java.time.LocalDateTime changedAt;
+    public java.time.LocalDateTime getChangedAt() { return changedAt; }
+    public void setChangedAt(java.time.LocalDateTime changedAt) { this.changedAt = changedAt; }
+
     public Long getId() {
         return id;
     }

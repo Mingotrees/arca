@@ -10961,6 +10961,10 @@ This operation does not require authentication
 |files|[[FileResponse](#schemafileresponse)]|false|none|none|
 |isLatestVersion|boolean|false|none|none|
 |latestVersion|boolean|false|none|none|
+# Phase 10 contract update
+
+Independently disabled-by-default modules add admin announcement CRUD/paging under `/api/v1/admin/announcements`, authenticated global active reads at `/api/v1/announcements/active`, and `/api/v1/posts/trending?window=7d&limit=10`. Announcements use plain text/validated HTTP(S) links, UTC publication windows, priority ordering, actor snapshots and atomic audit events. Trending returns explicit version summaries ranked by recent held votes and UTC approval age, windows24h/7d/30d and maximum50 rows. V11 adds announcement storage/indexes and nullable vote changed_at without historical backfill. Existing vote/search/post contracts remain unchanged. See [Phase 10 operations](docs/phase-10-operations.md) and [openapi.yaml](openapi.yaml) for flags, exact defaults, score, eligibility, limits and rollout.
+
 # Phase 9 contract update
 
 Admin-only `GET /api/v1/admin/audit-events` provides stable newest-first filtered pages (`content`, `page`, `size`, `total_elements`, `total_pages`). Supports bounded page/size, action/outcome/target_type, actor_id/target_id, UTC offset from/to windows <=90 days. Records retain numeric actor/target provenance with minimal allowlisted role metadata; successful mutations commit atomically with their events, while externally observed security failures use an independent best-effort path. One-year retention is manual database-operator work; no application update/delete API. See [Phase 9 operations](docs/phase-9-operations.md) for action coverage, privacy, export limitations, runtime grants and V10 rollout; [openapi.yaml](openapi.yaml) is the wire contract.
