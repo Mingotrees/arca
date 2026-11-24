@@ -22,6 +22,13 @@ import java.util.NoSuchElementException;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(RecoveryRateLimitException.class)
+    public ResponseEntity<Object> handleRecoveryRateLimit(RecoveryRateLimitException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).header("Retry-After", Long.toString(ex.retryAfter()))
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(ApiErrors.body(429, "too_many_requests", ex.getMessage()));
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Object> handleResponseStatusException(ResponseStatusException ex) {
         String message = ex.getReason() == null ? ex.getMessage() : ex.getReason();
@@ -74,16 +81,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleAllExceptions(Exception ex) {
-        return error(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred", ex.getClass().getSimpleName());
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred", "internal_server_error");
     }
 
     private ResponseEntity<Object> error(HttpStatusCode status, String message, String error) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", status.value());
-        body.put("error", error);
-        body.put("message", message);
-
-        return new ResponseEntity<>(body, status);
+        return ResponseEntity.status(status).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(ApiErrors.body(status.value(), error, message));
     }
 }

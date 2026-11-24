@@ -14,18 +14,22 @@ import java.util.stream.Collectors;
 
 @Service
 public class SchoolServiceImplementation implements SchoolService {
+    private final com.popman.arca.service.audit.AuditService audit;
 
     private final SchoolRepository schoolRepository;
 
-    public SchoolServiceImplementation(SchoolRepository schoolRepository) {
+    public SchoolServiceImplementation(SchoolRepository schoolRepository, com.popman.arca.service.audit.AuditService audit) {
         this.schoolRepository = schoolRepository;
+        this.audit = audit;
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public SchoolResponse addSchoolV1(SchoolRequest request) {
         School school = new School();
         school.setName(request.getName());
         School saved = schoolRepository.save(school);
+        audit.success(com.popman.arca.service.audit.AuditAction.SCHOOL_CREATED, saved.getId());
         return mapToResponse(saved);
     }
 
@@ -45,16 +49,21 @@ public class SchoolServiceImplementation implements SchoolService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public SchoolResponse editSchoolV1(Long id, SchoolRequest request) {
         School school = schoolRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("School not found with ID: " + id));
         school.setName(request.getName());
+        audit.success(com.popman.arca.service.audit.AuditAction.SCHOOL_UPDATED, id);
         return mapToResponse(schoolRepository.save(school));
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public void deleteSchoolV1(Long id) {
+        if (!schoolRepository.existsById(id)) throw new NoSuchElementException("School not found");
         schoolRepository.deleteById(id);
+        audit.success(com.popman.arca.service.audit.AuditAction.SCHOOL_DELETED, id);
     }
 
     private SchoolResponse mapToResponse(School school) {

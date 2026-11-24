@@ -11,6 +11,9 @@ import com.popman.arca.dto.v1.post.PostUpdateResponse;
 import java.util.List;
 
 public interface PostService {
+    com.popman.arca.dto.v1.post.PostSearchResponse searchPostsV1(
+            com.popman.arca.dto.v1.post.PostSearchCriteria criteria, boolean isAdmin);
+
     PostResponse getPostV1(Long rowId, Long actorId, boolean isAdmin);
 
     List<PostResponse> getAllPostsV1();

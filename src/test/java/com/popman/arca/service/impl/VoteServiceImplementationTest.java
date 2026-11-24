@@ -46,6 +46,7 @@ class VoteServiceImplementationTest {
     void rejectsVoteOnNonApprovedPost() {
         Post post = new Post();
         post.setStatus("PENDING_APPROVAL");
+        post.setUserId(3L);
         VoteRequest request = new VoteRequest(5L, "UPVOTE");
         when(postRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(post));
 

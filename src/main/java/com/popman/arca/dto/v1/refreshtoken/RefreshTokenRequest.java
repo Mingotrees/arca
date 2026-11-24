@@ -1,6 +1,7 @@
 package com.popman.arca.dto.v1.refreshtoken;
 
 public class RefreshTokenRequest {
+    @com.fasterxml.jackson.annotation.JsonProperty("refresh_token")
     private String refreshToken;
 
     // Constructors

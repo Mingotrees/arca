@@ -26,6 +26,8 @@ class SecurityConfigIntegrationTest {
         mockMvc.perform(get("/api/v1/posts"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.timestamp").exists())
                 .andExpect(jsonPath("$.error").value("unauthorized"));
     }
 
@@ -34,6 +36,7 @@ class SecurityConfigIntegrationTest {
     void normalUserCannotReadModerationQueue() throws Exception {
         mockMvc.perform(get("/api/v1/posts/pending"))
                 .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.error").value("forbidden"));
     }
 

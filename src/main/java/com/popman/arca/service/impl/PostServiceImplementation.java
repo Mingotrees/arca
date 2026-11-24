@@ -18,6 +18,11 @@ import com.popman.arca.repository.PostRepository;
 import com.popman.arca.repository.SubjectRepository;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.PostService;
+import com.popman.arca.service.PostAccessPolicy;
+import com.popman.arca.dto.v1.post.PostSearchCriteria;
+import com.popman.arca.dto.v1.post.PostSearchResponse;
+import com.popman.arca.repository.PostSearchRepository;
+import com.popman.arca.repository.VoteRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -35,6 +40,44 @@ import java.util.stream.Collectors;
 
 @Service
 public class PostServiceImplementation implements PostService {
+
+    private final PostAccessPolicy accessPolicy = new PostAccessPolicy();
+    @Autowired private com.popman.arca.service.audit.AuditService audit;
+    private final com.popman.arca.service.links.PostLinkValidator linkValidator = new com.popman.arca.service.links.PostLinkValidator();
+
+    @Autowired
+    private PostSearchRepository searchRepository;
+
+    @Autowired
+    private VoteRepository voteRepository;
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true,
+            isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public PostSearchResponse searchPostsV1(PostSearchCriteria criteria, boolean isAdmin) {
+        if (criteria.status() != null && !isAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Status filtering requires admin access");
+        }
+        var result = searchRepository.search(criteria);
+        List<PostResponse> content = List.of();
+        if (!result.ids().isEmpty()) {
+            var postsById = postRepository.findSearchPageDetails(result.ids()).stream()
+                    .collect(Collectors.toMap(Post::getId, post -> post));
+            postRepository.fetchSearchPageFiles(result.ids());
+            postRepository.fetchSearchPageLinks(result.ids());
+            var votes = voteRepository.countSearchPageVotes(result.ids()).stream()
+                    .collect(Collectors.toMap(VoteRepository.PostVoteCounts::getPostId, counts -> counts));
+            content = result.ids().stream().map(id -> {
+                Post post = postsById.get(id);
+                accessPolicy.requireReadable(post);
+                var counts = votes.get(id);
+                return mapToResponse(post, counts == null ? 0 : Math.toIntExact(counts.getUpvotes()),
+                        counts == null ? 0 : Math.toIntExact(counts.getDownvotes()));
+            }).toList();
+        }
+        long pages = result.total() / criteria.size() + (result.total() % criteria.size() == 0 ? 0 : 1);
+        return new PostSearchResponse(content, criteria.page(), criteria.size(), result.total(), pages, criteria.sort());
+    }
 
     @Autowired
     private PostRepository postRepository;
@@ -58,11 +101,8 @@ public class PostServiceImplementation implements PostService {
     public PostResponse getPostV1(Long rowId, Long actorId, boolean isAdmin) {
         Post post = postRepository.findById(rowId)
                 .orElseThrow(() -> new ResponseStatusException(
-                         HttpStatus.NOT_FOUND, "Post not found with id: " + rowId));
-        requireActive(post);
-        if (!"APPROVED".equals(post.getStatus()) && !isAdmin && !post.getUserId().equals(actorId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Post is not available to this user");
-        }
+                         HttpStatus.NOT_FOUND, "Post not found"));
+        accessPolicy.requireReadable(post, actorId, isAdmin);
         return mapToResponse(post);
     }
 
@@ -109,6 +149,7 @@ public class PostServiceImplementation implements PostService {
     @Override
     @Transactional
     public PostCreateResponse createPostV1(PostRequest request, Long actorId) {
+        var links = linkValidator.validate(request.getLinks());
         userRepository.findById(actorId)
                 .orElseThrow(() -> new NoSuchElementException("User not found with Id " + actorId));
 
@@ -128,6 +169,7 @@ public class PostServiceImplementation implements PostService {
         post.setStatus("PENDING_APPROVAL");
         post.setUpdatedAt(LocalDateTime.now());
         post.setCreatedAt(LocalDateTime.now());
+        links.forEach(post::addLink);
 
         if(request.getPostTag() != null && !request.getPostTag().isEmpty()){
             Subject subject = subjectRepository.findById(Long.parseLong(request.getPostTag()))
@@ -160,6 +202,10 @@ public class PostServiceImplementation implements PostService {
             throw new IllegalStateException("Only approved posts can be updated. Current status: " + currentPost.getStatus());
         }
 
+        var links = updateRequest.getLinks() == null
+                ? currentPost.getLinks().stream().map(com.popman.arca.entity.PostLink::copy).toList()
+                : linkValidator.validate(updateRequest.getLinks());
+
         Integer maxVersion = postRepository.findMaxVersionByPostId(currentPost.getPost_id());
         postRepository.updateIsLatestVersionByPostId(currentPost.getPost_id(), false);
 
@@ -174,6 +220,7 @@ public class PostServiceImplementation implements PostService {
         newVersion.setIsLatestVersion(true);
         newVersion.setCreatedAt(LocalDateTime.now());
         newVersion.setUpdatedAt(LocalDateTime.now());
+        links.forEach(newVersion::addLink);
 
         if (updateRequest.getPostTag() != null && !updateRequest.getPostTag().isEmpty()) {
             Subject subject = subjectRepository.findById(Long.parseLong(updateRequest.getPostTag()))
@@ -229,6 +276,7 @@ public class PostServiceImplementation implements PostService {
 
         if (approvalRequest.getApproved()) {
             post.setStatus("APPROVED");
+            post.setApprovedAt(LocalDateTime.now(java.time.ZoneOffset.UTC));
 
             if (post.getVersion() > 1) {
                 Post previousApproved = postRepository
@@ -244,6 +292,7 @@ public class PostServiceImplementation implements PostService {
             post.setUpdatedAt(LocalDateTime.now());
             postRepository.save(post);
 
+            audit.success(com.popman.arca.service.audit.AuditAction.POST_APPROVED, post.getId());
             return "Post approved successfully. Now visible to users.";
 
         } else {
@@ -267,6 +316,7 @@ public class PostServiceImplementation implements PostService {
             post.setUpdatedAt(LocalDateTime.now());
             postRepository.save(post);
 
+            audit.success(com.popman.arca.service.audit.AuditAction.POST_REJECTED, post.getId());
             return "Post rejected. " +
                     (approvalRequest.getRejectionReason() != null ?
                             "Reason: " + approvalRequest.getRejectionReason() : "No reason given");
@@ -276,7 +326,7 @@ public class PostServiceImplementation implements PostService {
     @Override
     public List<PostResponse> getPostHistoryV1(Integer postId) {
         List<Post> versions = postRepository.findAllVersionsByPostId(postId);
-        return versions.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return versions.stream().filter(accessPolicy::canRead).map(this::mapToResponse).collect(Collectors.toList());
     }
 
     @Override
@@ -291,11 +341,10 @@ public class PostServiceImplementation implements PostService {
         postRepository.lockLogicalPostByRowId(rowId);
         Post post = postRepository.findByIdForUpdate(rowId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
-        if (!isAdmin && !post.getUserId().equals(actorId)) {
-            throw new ResponseStatusException(post.isDeleted() ? HttpStatus.NOT_FOUND : HttpStatus.FORBIDDEN,
-                    post.isDeleted() ? "Post not found" : "Only post owner or admin may modify this post");
-        }
+        accessPolicy.requireDeletable(post, actorId, isAdmin);
+        if (post.isDeleted()) return;
         postRepository.softDeleteLogicalPost(post.getPost_id(), actorId, LocalDateTime.now());
+        audit.success(com.popman.arca.service.audit.AuditAction.POST_DELETED, post.getPost_id().longValue());
     }
 
     @Override
@@ -306,6 +355,20 @@ public class PostServiceImplementation implements PostService {
 
 
     private PostResponse mapToResponse(Post post) {
+        int upvotes = 0;
+        int downvotes = 0;
+        try {
+            upvotes = voteServiceImplementation.getUpvoteCountV1(post.getId());
+            downvotes = voteServiceImplementation.getDownvoteCountV1(post.getId());
+        } catch (Exception e) {
+            // Preserve legacy list mapping behavior; search supplies explicit batched counts instead.
+            upvotes = 0;
+            downvotes = 0;
+        }
+        return mapToResponse(post, upvotes, downvotes);
+    }
+
+    private PostResponse mapToResponse(Post post, int upvotes, int downvotes) {
         PostResponse response = new PostResponse();
         response.setId(post.getId());
         response.setPostId(post.getPost_id());
@@ -316,6 +379,8 @@ public class PostServiceImplementation implements PostService {
         response.setIsLatestVersion(post.getIsLatestVersion());
         response.setCreatedAt(post.getCreatedAt());
         response.setUpdatedAt(post.getUpdatedAt());
+        response.setLinks(post.getLinks().stream().map(link -> new com.popman.arca.dto.v1.post.PostLinkResponse(
+                link.getUrl(), link.getLabel(), link.getPosition())).toList());
 
         List<PostSubjectResponse> subjects = post.getSubjects() == null
                 ? List.of()
@@ -345,16 +410,8 @@ public class PostServiceImplementation implements PostService {
             response.setRejectionReason(post.getRejectionReason());
         }
 
-        try {
-            Integer upvotes = voteServiceImplementation.getUpvoteCountV1(post.getId());
-            Integer downvotes = voteServiceImplementation.getDownvoteCountV1(post.getId());
-
-            response.setUpvoteCount(upvotes);
-            response.setDownvoteCount(downvotes);
-        } catch (Exception e) {
-            response.setUpvoteCount(0);
-            response.setDownvoteCount(0);
-        }
+        response.setUpvoteCount(upvotes);
+        response.setDownvoteCount(downvotes);
 
         if (post.getFiles() != null && !post.getFiles().isEmpty()) {
                 List<FileResponse> fileResponses = post.getFiles().stream()
@@ -374,11 +431,8 @@ public class PostServiceImplementation implements PostService {
     private Post getOwnedOrAdminPost(Long rowId, Long actorId, boolean isAdmin) {
         Post post = postRepository.findByIdForUpdate(rowId)
                 .orElseThrow(() -> new ResponseStatusException(
-                         HttpStatus.NOT_FOUND, "Post not found with id: " + rowId));
-        requireActive(post);
-        if (!isAdmin && !post.getUserId().equals(actorId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only post owner or admin may modify this post");
-        }
+                         HttpStatus.NOT_FOUND, "Post not found"));
+        accessPolicy.requireMutable(post, actorId, isAdmin);
         return post;
     }
 

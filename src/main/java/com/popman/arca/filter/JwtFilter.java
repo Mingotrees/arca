@@ -4,6 +4,7 @@ package com.popman.arca.filter;
 import com.popman.arca.service.JWTService;
 import com.popman.arca.service.BannedEmailService;
 import com.popman.arca.service.MyUserDetailsService;
+import com.popman.arca.exceptions.ApiErrors;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -35,15 +36,7 @@ public class JwtFilter extends OncePerRequestFilter {
     protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain) throws ServletException, IOException {
         // Allow CORS preflight requests to proceed without JWT checks and return proper CORS headers
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-            String origin = request.getHeader("Origin");
-            if (origin != null) {
-                response.setHeader("Access-Control-Allow-Origin", origin);
-                response.setHeader("Vary", "Origin");
-                response.setHeader("Access-Control-Allow-Credentials", "true");
-                response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS,PATCH");
-                response.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type,Accept");
-            }
-            response.setStatus(HttpServletResponse.SC_OK);
+            filterChain.doFilter(request, response);
             return;
         }
 
@@ -90,9 +83,6 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private void writeJsonError(HttpServletResponse response, int status, String error, String message)
             throws IOException {
-        response.setStatus(status);
-        response.setCharacterEncoding("UTF-8");
-        response.setContentType("application/json");
-        response.getWriter().write("{\"error\":\"" + error + "\",\"message\":\"" + message + "\"}");
+        ApiErrors.write(response, status, error, message);
     }
 }

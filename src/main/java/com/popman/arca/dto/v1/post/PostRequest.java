@@ -12,12 +12,23 @@ public class PostRequest {
     @NotBlank(message = "Content is required")
     private String content;
 
+    @io.swagger.v3.oas.annotations.media.Schema(deprecated = true,
+            description = "Ignored legacy ownership input; owner is always the authenticated JWT principal")
+    @com.fasterxml.jackson.annotation.JsonProperty("user_id")
     private Long userId;
 
     @NotNull(message = "Department ID is required")
+    @com.fasterxml.jackson.annotation.JsonProperty("department_id")
     private Long departmentId;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("post_tag")
     private String postTag;
+
+    @io.swagger.v3.oas.annotations.media.Schema(types = {"array", "null"}, description = "Optional ordered HTTP(S) links, maximum 10. Omitted/null creates no links; canonical duplicates reject the request.")
+    @jakarta.validation.constraints.Size(max = 10)
+    private java.util.List<PostLinkRequest> links;
+    public java.util.List<PostLinkRequest> getLinks() { return links; }
+    public void setLinks(java.util.List<PostLinkRequest> links) { this.links = links; }
 
     public PostRequest() {}
 

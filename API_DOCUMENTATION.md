@@ -10961,3 +10961,46 @@ This operation does not require authentication
 |files|[[FileResponse](#schemafileresponse)]|false|none|none|
 |isLatestVersion|boolean|false|none|none|
 |latestVersion|boolean|false|none|none|
+# Phase 10 contract update
+
+Independently disabled-by-default modules add admin announcement CRUD/paging under `/api/v1/admin/announcements`, authenticated global active reads at `/api/v1/announcements/active`, and `/api/v1/posts/trending?window=7d&limit=10`. Announcements use plain text/validated HTTP(S) links, UTC publication windows, priority ordering, actor snapshots and atomic audit events. Trending returns explicit version summaries ranked by recent held votes and UTC approval age, windows24h/7d/30d and maximum50 rows. V11 adds announcement storage/indexes and nullable vote changed_at without historical backfill. Existing vote/search/post contracts remain unchanged. See [Phase 10 operations](docs/phase-10-operations.md) and [openapi.yaml](openapi.yaml) for flags, exact defaults, score, eligibility, limits and rollout.
+
+# Phase 9 contract update
+
+Admin-only `GET /api/v1/admin/audit-events` provides stable newest-first filtered pages (`content`, `page`, `size`, `total_elements`, `total_pages`). Supports bounded page/size, action/outcome/target_type, actor_id/target_id, UTC offset from/to windows <=90 days. Records retain numeric actor/target provenance with minimal allowlisted role metadata; successful mutations commit atomically with their events, while externally observed security failures use an independent best-effort path. One-year retention is manual database-operator work; no application update/delete API. See [Phase 9 operations](docs/phase-9-operations.md) for action coverage, privacy, export limitations, runtime grants and V10 rollout; [openapi.yaml](openapi.yaml) is the wire contract.
+
+# Phase 8 contract update
+
+Admin-only `GET /api/v1/admin/dashboard` returns `calculated_at`, UTC effective `from`/`to`, and aggregate `users`, `posts`, `moderation`, `engagement` groups. Optional ISO offset date-times define a positive `[from,to)` period of at most 90 days, default trailing 90 days; precision at most microseconds. Current totals stay all-time. Approval activity counts version-specific UTC `approved_at`, retained after superseding/deletion; legacy approval dates remain null and counted separately as unknown. V9 adds the nullable column. See [Phase 8 operations](docs/phase-8-operations.md) for exact status/eligibility/size semantics, clock limitations, queries and rollout, and [openapi.yaml](openapi.yaml) for schemas and JSON 400/401/403 errors.
+
+# Phase 7 contract update
+
+Post create/update accepts optional ordered `links` (`url`, optional `label`), maximum 10. Only valid absolute HTTP(S) URLs without credentials are accepted; canonical duplicates and invalid/overlong links return 400 atomically. Omitted/null update copies source-version links; `[]` clears links only in the new version. Read/list/search/history `PostResponse` adds `links` (`url`, `label`, zero-based `position`), defaulting to `[]`. Parent visibility/deletion applies unchanged; backend never fetches submitted destinations. See [Phase 7 operations](docs/phase-7-operations.md) and [openapi.yaml](openapi.yaml) for exact limits, normalization, version semantics and V8 rollout.
+
+# Phase 6 contract update
+
+`/api/v1/user/{userId}/cover-picture`: owner/admin `PUT` accepts multipart `file` and returns `user_id`, `cover_picture`, `message`; public `GET` returns binary JPEG/PNG/WebP with no-store/nosniff headers; owner/admin `DELETE` returns a message and is idempotent for an existing user without a cover. Missing user/reference/object reads return 404. `UserResponse` adds optional read-only `cover_picture` (relative storage key, omitted when absent). Covers use the existing 10 MiB/25-million-pixel image validator and separate `cover-pictures/` storage with commit/rollback-aware cleanup. See [Phase 6 operations](docs/phase-6-operations.md) and [openapi.yaml](openapi.yaml) for authorization, errors, V7 rollout and cleanup assumptions.
+
+# Phase 5 contract update
+
+Authenticated GET `/api/v1/user/{userId}/stats` returns `approved_post_count`, `upvotes_received`, `downvotes_received`; GET `/api/v1/subject/{subjectId}/stats` returns `approved_post_count`, `last_approved_post_at` (null for no eligible posts). Counts use approved/latest/non-deleted version rows and deduplicate logical post IDs. User/subject responses add optional UTC created_at/updated_at fields; legacy creation times are deployment-time approximations recorded internally. Existing response fields and JWT access rules remain. See [Phase 5 operations](docs/phase-5-operations.md) and [openapi.yaml](openapi.yaml) for clock/provenance, retained deletion semantics, indexed query evidence and V6 rollout.
+
+# Phase 4 contract update
+
+Anonymous POST `/api/v1/auth/password-recovery` accepts `email` and returns a generic 202 when configured. POST `/api/v1/auth/password-reset` accepts `token` and `new_password`, consumes an expiring one-use token, updates BCrypt password and revokes refresh sessions. New routes return 503 until enabled/configured, 429 with Retry-After for abuse limits, and standard JSON errors. Reset tokens are delivered only by email as frontend URL fragments, never in API responses. Existing access JWTs retain normal lifetime. See [Phase 4 operations](docs/phase-4-operations.md) and [openapi.yaml](openapi.yaml) for full configuration and contracts. Legacy refresh/logout requests use the existing snake_case `refresh_token` wire field.
+
+# Phase 3 contract update
+
+`GET /api/v1/posts/search` adds full-text discovery and a page envelope (`content`, `page`, `size`, `total_elements`, `total_pages`, `sort`). Legacy list routes remain arrays. Query parameters, admin-only moderation-status filtering, timestamp/tokenization semantics, index rollout and observed plans are documented in [Phase 3 operations](docs/phase-3-operations.md) and [openapi.yaml](openapi.yaml). This new endpoint requires the existing bearer JWT.
+
+# Phase 2 contract update
+
+The current resource-visibility, upload-limit, error-envelope and storage rules are documented in [Phase 2 operations](docs/phase-2-operations.md) and [openapi.yaml](openapi.yaml). Private/pending/rejected/superseded versions are owner/admin-only across posts, files, history, votes and vaults; inaccessible parents return 404. Legacy `user_id` ownership inputs are ignored. Uploads validate content as well as extension/MIME, enforce 10 MiB byte and 25-million-pixel limits, and return 400/413/415 for invalid content. Successful routes and payloads remain compatible. Examples below may predate these tightened rules.
+
+Use snake_case request fields, matching both runtime binding and the updated request schemas:
+
+```json
+{"post_id":42,"vote_type":"UPVOTE"}
+```
+
+The same row-ID field is used for vault additions (`{"post_id":42,"label":"Study"}`) and label edits (`{"post_id":42,"new_label":"Exam"}`). Post creation uses `department_id` and optional `post_tag`; any legacy `user_id` remains ignored.

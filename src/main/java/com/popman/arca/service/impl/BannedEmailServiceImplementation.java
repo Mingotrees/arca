@@ -15,9 +15,11 @@ public class BannedEmailServiceImplementation implements BannedEmailService {
 
     private static final Logger logger = LoggerFactory.getLogger(BannedEmailServiceImplementation.class);
     private final BannedEmailRepository bannedEmailRepository;
+    private final com.popman.arca.service.audit.AuditService audit;
 
-    public BannedEmailServiceImplementation(BannedEmailRepository bannedEmailRepository) {
+    public BannedEmailServiceImplementation(BannedEmailRepository bannedEmailRepository, com.popman.arca.service.audit.AuditService audit) {
         this.bannedEmailRepository = bannedEmailRepository;
+        this.audit = audit;
     }
 
     @Override
@@ -38,6 +40,7 @@ public class BannedEmailServiceImplementation implements BannedEmailService {
         }
         BannedEmail entry = new BannedEmail(normalized, reason);
         bannedEmailRepository.save(entry);
+        audit.success(com.popman.arca.service.audit.AuditAction.EMAIL_BANNED, entry.getId());
         logger.info("Banned email: {}", normalized);
         return "Email banned successfully";
     }
@@ -49,10 +52,10 @@ public class BannedEmailServiceImplementation implements BannedEmailService {
             throw new IllegalArgumentException("Email cannot be null or empty");
         }
         String normalized = email.trim();
-        if (!bannedEmailRepository.existsByEmailIgnoreCase(normalized)) {
-            throw new IllegalArgumentException("Email is not banned");
-        }
+        BannedEmail entry = bannedEmailRepository.findByEmailIgnoreCase(normalized)
+                .orElseThrow(() -> new IllegalArgumentException("Email is not banned"));
         bannedEmailRepository.deleteByEmailIgnoreCase(normalized);
+        audit.success(com.popman.arca.service.audit.AuditAction.EMAIL_UNBANNED, entry.getId());
         logger.info("Unbanned email: {}", normalized);
         return "Email unbanned successfully";
     }

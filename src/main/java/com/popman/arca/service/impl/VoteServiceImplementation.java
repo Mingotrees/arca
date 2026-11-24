@@ -9,6 +9,7 @@ import com.popman.arca.repository.PostRepository;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.repository.VoteRepository;
 import com.popman.arca.service.VoteService;
+import com.popman.arca.service.PostAccessPolicy;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,8 @@ import java.util.NoSuchElementException;
 
 @Service
 public class VoteServiceImplementation implements VoteService {
+
+    private final PostAccessPolicy accessPolicy = new PostAccessPolicy();
 
     @Autowired
     private VoteRepository voteRepository;
@@ -35,7 +38,7 @@ public class VoteServiceImplementation implements VoteService {
         postRepository.lockLogicalPostByRowId(request.getPostId());
         Post post = postRepository.findByIdForUpdate(request.getPostId())
                 .orElseThrow(() -> new NoSuchElementException("Post not found"));
-        requireActive(post);
+        accessPolicy.requireReadable(post, userId, accessPolicy.currentActorIsAdmin());
 
         if (!"APPROVED".equals(post.getStatus())) {
             throw new IllegalArgumentException("Votes are allowed only on approved posts");
@@ -58,6 +61,7 @@ public class VoteServiceImplementation implements VoteService {
         vote.setPost(post);
         vote.setUser(user);
         vote.setVoteType(request.getVoteType());
+        vote.setChangedAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
 
         Vote savedVote = voteRepository.save(vote);
 
@@ -69,12 +73,13 @@ public class VoteServiceImplementation implements VoteService {
         postRepository.lockLogicalPostByRowId(postId);
         Post post = postRepository.findByIdForUpdate(postId)
                 .orElseThrow(() -> new NoSuchElementException("Post not found"));
-        requireActive(post);
+        accessPolicy.requireReadable(post, userId, accessPolicy.currentActorIsAdmin());
         voteRepository.deleteByPostIdAndUserId(postId, userId);
     }
 
     public VoteResponse getUserVoteForPostV1(Long postId, Long userId) {
-        requireActivePost(postId);
+        Post post = postRepository.findById(postId).orElseThrow(() -> new NoSuchElementException("Post not found"));
+        accessPolicy.requireReadable(post, userId, accessPolicy.currentActorIsAdmin());
         return voteRepository.findByPostIdAndUserId(postId, userId)
                 .map(this::convertToDTO)
                 .orElse(null);
@@ -91,14 +96,8 @@ public class VoteServiceImplementation implements VoteService {
     }
 
     private void requireActivePost(Long postId) {
-        requireActive(postRepository.findById(postId)
+        accessPolicy.requireReadable(postRepository.findById(postId)
                 .orElseThrow(() -> new NoSuchElementException("Post not found")));
-    }
-
-    private void requireActive(Post post) {
-        if (post.isDeleted()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found");
-        }
     }
 
     private VoteResponse convertToDTO(Vote vote) {

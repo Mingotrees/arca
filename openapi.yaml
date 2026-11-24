@@ -2,12 +2,637 @@ openapi: 3.1.0
 info:
   title: arca API
   version: v1
+  description: >-
+    JSON errors use timestamp, status, error and message fields. Resource authorization
+    conceals missing, deleted and inaccessible posts with 404. Owners/admins may
+    read active private versions; other authenticated users may read APPROVED
+    versions only. Vault entry and missing public-avatar reads retain empty 404
+    responses. Successful payloads retain existing field names and response shapes.
 servers:
 - url: https://arca-backend.dcism.org
   description: Production
 - url: http://localhost:20255
   description: Local development
 paths:
+  /api/v1/admin/announcements:
+    get:
+      tags: [admin-announcement-controller]
+      summary: List announcements for administration
+      description: Includes active, inactive, expired and future global announcements; excludes deleted. Stable created_at DESC,id DESC. Page defaults0/max10000, size defaults20/max100. Requires ANNOUNCEMENTS_ENABLED.
+      operationId: listAnnouncements
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema: {type: integer, format: int32, maximum: 10000, minimum: 0}
+      - name: size
+        in: query
+        required: false
+        schema: {type: integer, format: int32, maximum: 100, minimum: 1}
+      responses:
+        '400':
+          description: Invalid announcement or bounds
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '401':
+          description: Authentication required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '403':
+          description: Admin required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '404':
+          description: Module disabled or announcement missing/deleted
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '200':
+          description: Admin announcement page
+          content: {application/json: {schema: {$ref: '#/components/schemas/AnnouncementPage'}}}
+      security:
+      - bearerAuth: []
+    post:
+      tags: [admin-announcement-controller]
+      summary: Create global announcement
+      description: Admin only. Requires ANNOUNCEMENTS_ENABLED, default false. Title max128, plain-text body max4096 or validated HTTP(S) URL max2048 required. Priority defaults0, active defaultsfalse. UTC starts_at inclusive/ends_at exclusive, nullable bounds, microsecond precision, years1000–9999. No URL fetching. Creation and redacted audit event commit atomically; actor comes from authenticated account.
+      operationId: createAnnouncement
+      requestBody:
+        content: {application/json: {schema: {$ref: '#/components/schemas/AnnouncementRequest'}}}
+        required: true
+      responses:
+        '400':
+          description: Invalid announcement or bounds
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '401':
+          description: Authentication required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '403':
+          description: Admin required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '404':
+          description: Module disabled or announcement missing/deleted
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '201':
+          description: Announcement created
+          content: {application/json: {schema: {$ref: '#/components/schemas/AdminAnnouncementResponse'}}}
+      security:
+      - bearerAuth: []
+  /api/v1/admin/announcements/{id}:
+    get:
+      tags: [admin-announcement-controller]
+      summary: Read announcement for administration
+      operationId: getAnnouncement
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: integer, format: int64}
+      responses:
+        '400':
+          description: Invalid announcement or bounds
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '401':
+          description: Authentication required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '403':
+          description: Admin required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '404':
+          description: Module disabled or announcement missing/deleted
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '200':
+          description: Admin announcement
+          content: {application/json: {schema: {$ref: '#/components/schemas/AdminAnnouncementResponse'}}}
+      security:
+      - bearerAuth: []
+    put:
+      tags: [admin-announcement-controller]
+      summary: Replace announcement
+      description: 'Full replacement, not PATCH: omitted active/priority/bounds become false/0/null. Existing creation metadata is retained. Serializes with deletion; update and audit event commit atomically.'
+      operationId: replaceAnnouncement
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: integer, format: int64}
+      requestBody:
+        content: {application/json: {schema: {$ref: '#/components/schemas/AnnouncementRequest'}}}
+        required: true
+      responses:
+        '400':
+          description: Invalid announcement or bounds
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '401':
+          description: Authentication required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '403':
+          description: Admin required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '404':
+          description: Module disabled or announcement missing/deleted
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '200':
+          description: Announcement replaced
+          content: {application/json: {schema: {$ref: '#/components/schemas/AdminAnnouncementResponse'}}}
+      security:
+      - bearerAuth: []
+    delete:
+      tags: [admin-announcement-controller]
+      summary: Delete announcement
+      description: Soft deletion, no restore API. Retains row and actor snapshots. Repeated deletion of existing row returns204 without another audit event; missing row404.
+      operationId: deleteAnnouncement
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: integer, format: int64}
+      responses:
+        '400':
+          description: Invalid announcement or bounds
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '401':
+          description: Authentication required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '403':
+          description: Admin required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '404':
+          description: Module disabled or announcement missing/deleted
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '204': {description: Announcement deleted}
+      security:
+      - bearerAuth: []
+  /api/v1/announcements/active:
+    get:
+      tags: [announcement-controller]
+      summary: Read active global announcements
+      description: Authenticated users/admins, global audience. Active/non-deleted and starts_at<=now (or null), ends_at>now (or null), UTC. Priority DESC,COALESCE(starts_at,created_at) DESC,id DESC. Limit default10/max50. Plain-text fields require safe client rendering; URLs are never fetched. ANNOUNCEMENTS_ENABLED defaultsfalse; disabled404. No cache or scheduler.
+      operationId: activeAnnouncements
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema: {type: integer, format: int32, maximum: 50, minimum: 1}
+      responses:
+        '200':
+          description: Active announcements
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/AnnouncementResponse'}
+        '400':
+          description: Invalid limit
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '401':
+          description: Authentication required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '403':
+          description: User/admin role required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '404':
+          description: Module disabled
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+      security:
+      - bearerAuth: []
+  /api/v1/posts/trending:
+    get:
+      tags: [trending-controller]
+      summary: Read trending post summaries
+      description: Authenticated user/admin. TRENDING_ENABLED defaultsfalse; disabled404. Window default7d, supported24h/7d/30d, limit default10/max50. Highest approved/latest/non-deleted version per logical post, known approved_at within [calculated_at-window,calculated_at). Counts currently held votes on that version with changed_at in same UTC window; legacy-null/future dates excluded. Score=(1+recent_upvotes)/((1+recent_downvotes)*POWER(2+age_hours,1.5)), age since UTC approval. Order score DESC,approved_at DESC,id DESC. No score, private body, files or entity graphs returned; no view tracking, URL fetching, cache or search-sort alias. Vote toggles cannot accumulate duplicates; not a complete anti-abuse system.
+      operationId: trendingPosts
+      parameters:
+      - name: window
+        in: query
+        required: false
+        schema: {type: string, enum: [24h, 7d, 30d]}
+      - name: limit
+        in: query
+        required: false
+        schema: {type: integer, format: int32, maximum: 50, minimum: 1}
+      responses:
+        '200':
+          description: Trending summaries
+          content: {application/json: {schema: {$ref: '#/components/schemas/TrendingResponse'}}}
+        '400':
+          description: Invalid window or limit
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '401':
+          description: Authentication required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '403':
+          description: User/admin role required
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+        '404':
+          description: Module disabled
+          content: {application/json: {schema: {$ref: '#/components/schemas/ApiErrorResponse'}}}
+      security:
+      - bearerAuth: []
+  /api/v1/admin/audit-events:
+    get:
+      tags: [admin-audit-controller]
+      summary: Read audit events
+      description: "Admin-only paged export/query. Stable occurred_at DESC,id DESC. Page 0–10000, size 1–100 (defaults 0/20). Exact allowlisted action/outcome/target_type and positive actor_id/target_id filters; target_id requires target_type. UTC [from,to), positive maximum 90 days, default trailing 90 days, offsets accepted, microsecond precision, years 1000–9999. Numeric actor/target IDs survive deletion; metadata contains only validated role for role changes, otherwise an empty object. No credentials, addresses, content or file paths. Events begin at deployment; one-year retention is manually managed by database operator. No update/delete API or cross-request export snapshot."
+      operationId: query
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema: {type: integer, format: int32, minimum: 0, maximum: 10000}
+      - name: size
+        in: query
+        required: false
+        schema: {type: integer, format: int32, minimum: 1, maximum: 100}
+      - name: action
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [LOGIN, PASSWORD_RESET, PASSWORD_RECOVERY, ACCESS_DENIED, ADMIN_CREATED, ROLE_ADDED, ROLE_REMOVED, USER_DELETED, EMAIL_BANNED, EMAIL_UNBANNED, POST_DELETED, POST_APPROVED, POST_REJECTED, SCHOOL_CREATED, SCHOOL_UPDATED, SCHOOL_DELETED, DEPARTMENT_CREATED, DEPARTMENT_UPDATED, DEPARTMENT_DELETED, SUBJECT_CREATED, SUBJECT_UPDATED, SUBJECT_DELETED, AVATAR_CHANGED, COVER_CHANGED, COVER_REMOVED, ANNOUNCEMENT_CREATED, ANNOUNCEMENT_UPDATED, ANNOUNCEMENT_DELETED]
+      - name: outcome
+        in: query
+        required: false
+        schema: {type: string, enum: [SUCCESS, DENIED, ERROR, ACCEPTED]}
+      - name: target_type
+        in: query
+        required: false
+        schema: {type: string, enum: [USER, SECURITY, BANNED_EMAIL, POST, POST_VERSION, SCHOOL, DEPARTMENT, SUBJECT, ANNOUNCEMENT]}
+      - name: actor_id
+        in: query
+        required: false
+        schema: {type: integer, format: int64, minimum: 1}
+      - name: target_id
+        in: query
+        required: false
+        schema: {type: integer, format: int64, minimum: 1}
+      - name: from
+        in: query
+        required: false
+        schema: {type: string, format: date-time}
+      - name: to
+        in: query
+        required: false
+        schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: Audit page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuditEventPage'}
+        '400':
+          description: Invalid bounds or filters
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiErrorResponse'}
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiErrorResponse'}
+        '403':
+          description: Admin required
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiErrorResponse'}
+      security:
+      - bearerAuth: []
+  /api/v1/admin/dashboard:
+    get:
+      tags: [admin-dashboard-controller]
+      summary: Read admin dashboard aggregates
+      description: "ROLE_ADMIN only. Current counts are not window-filtered. Current logical status uses highest version, including rejected rows without a latest flag; deleted logical posts are separate. Period creations count version 1; approvals count version rows with recorded approved_at, including superseded/deleted rows. Legacy approval dates remain unknown and are reported separately. Engagement counts approved/latest/non-deleted rows, including activity by deleted users. Attachment bytes are known nonnegative metadata, not disk usage; unknown sizes are reported separately. UTC [from,to), positive range at most 90 days; default to=calculation time, from=to minus 90 days. Offsets accepted; maximum microsecond precision and UTC years 1000–9999. Legacy creation times retain their original stored clock. Seven aggregate queries in one read-only repeatable-read transaction; no cache."
+      operationId: dashboard
+      parameters:
+      - name: from
+        in: query
+        description: Inclusive ISO offset date-time, default to minus 90 days
+        required: false
+        schema: {type: string, format: date-time}
+      - name: to
+        in: query
+        description: Exclusive ISO offset date-time, default calculation time
+        required: false
+        schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: Admin aggregates
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminDashboardResponse'}
+        '400':
+          description: Invalid date window
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiErrorResponse'}
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiErrorResponse'}
+        '403':
+          description: Admin role required
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiErrorResponse'}
+      security:
+      - bearerAuth: []
+  /api/v1/user/{userId}/stats:
+    get:
+      tags: [profile-statistics-controller]
+      summary: Read user profile statistics
+      description: "Same public aggregate set for all authenticated roles: approved/latest/non-deleted version rows. Post count deduplicates logical post_id; votes are counted on eligible version row IDs, including retained votes by deleted voters. Deleted user profiles return 404."
+      operationId: userStats
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: X-Request-ID
+        in: header
+        description: Optional safe correlation ID; invalid values are replaced by a UUID
+        schema: {type: string}
+      - name: userId
+        in: path
+        required: true
+        schema: {type: integer, format: int64, minimum: 1}
+      responses:
+        "200":
+          description: User aggregate statistics
+          headers:
+            X-Request-ID:
+              description: Safe request correlation ID
+              style: simple
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserStatsResponse'
+        "400":
+          description: Invalid profile ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "403":
+          description: Profile access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "404":
+          description: Profile missing or user deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/v1/subject/{subjectId}/stats:
+    get:
+      tags: [profile-statistics-controller]
+      summary: Read subject profile statistics
+      description: Counts distinct logical post_id among linked approved/latest/non-deleted rows. last_approved_post_at is MAX of eligible Post.updated_at, using its existing stored clock; null when empty. Active posts by deleted authors remain counted, consistent with existing post visibility. Owners/admins receive no private moderation counts.
+      operationId: subjectStats
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: X-Request-ID
+        in: header
+        description: Optional safe correlation ID; invalid values are replaced by a UUID
+        schema: {type: string}
+      - name: subjectId
+        in: path
+        required: true
+        schema: {type: integer, format: int64, minimum: 1}
+      responses:
+        "200":
+          description: Subject aggregate statistics
+          headers:
+            X-Request-ID:
+              description: Safe request correlation ID
+              style: simple
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubjectStatsResponse'
+        "400":
+          description: Invalid profile ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "403":
+          description: Profile access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "404":
+          description: Profile missing or user deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/v1/auth/password-recovery:
+    post:
+      tags: [password-recovery-controller]
+      summary: Request password recovery
+      description: Anonymous. Always returns the same accepted message for eligible, missing, deleted or banned accounts. A configured email provider receives a single-use reset link after commit; provider errors do not disclose eligibility. Recovery must be configured/enabled before use. Email is normalized for shared per-email and trusted-client-IP limits.
+      operationId: request
+      security: []
+      parameters:
+      - name: X-Request-ID
+        in: header
+        description: Optional safe correlation ID; invalid values are replaced by a UUID
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordRecoveryRequest'
+      responses:
+        "202":
+          description: Generic recovery acknowledgment; no token/account details
+          headers:
+            X-Request-ID:
+              description: Safe request correlation ID
+              style: simple
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        "400":
+          description: Invalid request or invalid/expired reset token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "429":
+          description: Recovery email/client-IP budget exhausted
+          headers:
+            Retry-After:
+              description: Seconds until retry
+              style: simple
+              schema: {type: integer, format: int64}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "503":
+          description: Password recovery not configured/enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/v1/auth/password-reset:
+    post:
+      tags: [password-recovery-controller]
+      summary: Complete password reset
+      description: Anonymous. Submit the 43-character token from the emailed URL fragment and new_password. Password requires 8+ characters, uppercase/lowercase/digit and at most 72 UTF-8 bytes. Token is single-use, expires after configured TTL (default 15 minutes), and newer requests supersede earlier unused tokens. Success revokes all refresh sessions and requires fresh login; existing access JWTs retain their remaining normal lifetime.
+      operationId: reset
+      security: []
+      parameters:
+      - name: X-Request-ID
+        in: header
+        description: Optional safe correlation ID; invalid values are replaced by a UUID
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        "200":
+          description: Password changed; sign in again
+          headers:
+            X-Request-ID:
+              description: Safe request correlation ID
+              style: simple
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        "400":
+          description: Invalid request or invalid/expired reset token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "429":
+          description: Recovery email/client-IP budget exhausted
+          headers:
+            Retry-After:
+              description: Seconds until retry
+              style: simple
+              schema: {type: integer, format: int64}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "503":
+          description: Password recovery not configured/enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+  /api/v1/posts/search:
+    get:
+      tags: [post-controller]
+      summary: Search and page posts
+      description: Filters intersect. Default results are APPROVED, latest and non-deleted for every role. q uses MySQL natural-language full-text over title/content; blank q is absent. Default sort is relevance with q, newest otherwise. from is inclusive and to exclusive on stored created_at (ISO local date-times, no timezone conversion). Explicit status requires admin; non-approved status searches use newest stored revision per logical post, including rejected revisions.
+      operationId: searchPosts
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: X-Request-ID
+        in: header
+        description: "Optional correlation ID: 1-64 letters, digits, dots, underscores or hyphens; invalid values are replaced by a UUID"
+        schema: {type: string}
+      - name: q
+        in: query
+        description: Natural-language title/content query; maximum 200 characters
+        required: false
+        schema: {type: string, maxLength: 200}
+      - name: subject_id
+        in: query
+        required: false
+        schema: {type: integer, format: int64, minimum: 1}
+      - name: department_id
+        in: query
+        required: false
+        schema: {type: integer, format: int64, minimum: 1}
+      - name: author_id
+        in: query
+        required: false
+        schema: {type: integer, format: int64, minimum: 1}
+      - name: from
+        in: query
+        description: Inclusive created_at lower bound, no offset
+        required: false
+        schema: {type: string}
+        example: '2026-01-01T00:00:00'
+      - name: to
+        in: query
+        description: Exclusive created_at upper bound, no offset
+        required: false
+        schema: {type: string}
+        example: '2026-02-01T00:00:00'
+      - name: page
+        in: query
+        required: false
+        schema: {type: integer, format: int32, minimum: 0, default: 0}
+      - name: size
+        in: query
+        required: false
+        schema: {type: integer, format: int32, minimum: 1, maximum: 100, default: 20}
+      - name: sort
+        in: query
+        required: false
+        schema: {type: string, enum: [newest, oldest, relevance, vote_score]}
+      - name: status
+        in: query
+        description: Admin only
+        required: false
+        schema: {type: string, enum: [APPROVED, PENDING_APPROVAL, REJECTED, SUPERSEDED]}
+      responses:
+        "200":
+          description: Bounded page of existing PostResponse objects
+          headers:
+            X-Request-ID:
+              description: Safe request correlation ID
+              style: simple
+              schema: {type: string}
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PostSearchResponse'
+        "400":
+          description: Invalid filter, date range, page, size or sort
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        "403":
+          description: Explicit status filter requires admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
   /api/v1/vaults/edit-label:
     put:
       tags:
@@ -29,6 +654,8 @@ paths:
                 $ref: "#/components/schemas/VaultResponse"
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
   /api/v1/user/{userId}:
     get:
       tags:
@@ -90,6 +717,100 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MessageResponse"
+  /api/v1/user/{userId}/cover-picture:
+    get:
+      tags: [user-controller]
+      summary: Read public user cover
+      description: Public cover image. Missing user, reference or stored object returns 404. Responses use no-store and nosniff.
+      operationId: getCoverPicture
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Cover picture
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Cover picture not found
+      security: []
+    put:
+      tags: [user-controller]
+      summary: Upload or replace user cover
+      security:
+      - bearerAuth: []
+      description: Owner/admin uploads JPEG, PNG or WebP. Maximum 10 MiB per file/request and 25000000 decoded pixels. Replaced objects are removed after commit.
+      operationId: updateCoverPicture
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required: [file]
+      responses:
+        '200':
+          description: Cover picture updated
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CoverPictureResponse'
+        '400':
+          description: Invalid or mismatched image
+        '401':
+          description: Authentication required
+        '403':
+          description: Only owner/admin may replace cover
+        '404':
+          description: User not found
+        '413':
+          description: Upload exceeds 10 MiB limit
+        '415':
+          description: Unsupported media type or extension
+    delete:
+      tags: [user-controller]
+      summary: Remove user cover
+      security:
+      - bearerAuth: []
+      description: Owner/admin removes cover. Idempotent for an existing user with no cover; file cleanup occurs after commit.
+      operationId: deleteCoverPicture
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Cover removed
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Authentication required
+        '403':
+          description: Only owner/admin may remove cover
+        '404':
+          description: User not found
   /api/v1/user/{userId}/profile-picture:
     get:
       tags:
@@ -116,6 +837,7 @@ paths:
       tags:
       - user-controller
       operationId: updateProfilePicture
+      description: Owner/admin uploads JPEG, PNG or WebP. Maximum 10 MiB per file/request and 25000000 decoded pixels. Public reads remain supported.
       parameters:
       - name: userId
         in: path
@@ -141,6 +863,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ProfilePictureResponse"
+        "400":
+          description: Invalid or mismatched image
+        "401":
+          description: Authentication required
+        "403":
+          description: Only owner/admin may replace avatar
+        "404":
+          description: User not found
+        "413":
+          description: Upload exceeds 10 MiB limit
+        "415":
+          description: Unsupported media type or extension
   /api/v1/subject/{subjectId}:
     get:
       tags:
@@ -244,7 +978,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PostResponse"
         "404":
-          description: Post not found, including deleted posts
+          description: Post missing, deleted or inaccessible
     put:
       tags:
       - post-controller
@@ -270,8 +1004,10 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PostUpdateResponse"
+        "403":
+          description: Visible post may only be modified by owner/admin
         "404":
-          description: Post not found, including deleted posts
+          description: Post missing, deleted or inaccessible
     delete:
       tags:
       - post-controller
@@ -312,7 +1048,7 @@ paths:
                 error: unauthorized
                 message: Authentication required
         "403":
-          description: Only owner/admin may delete an active post
+          description: Only owner/admin may delete a visible active post
           content:
             application/json:
               schema:
@@ -483,7 +1219,7 @@ paths:
       tags:
       - vote-controller
       operationId: vote
-      description: Request post_id is a post version database row id, not logical post_id. Deleted posts are inaccessible.
+      description: Request post_id is a post version database row id, not logical post_id. All operations require parent-post visibility; new votes require APPROVED status even for owner/admin.
       requestBody:
         content:
           application/json:
@@ -501,12 +1237,16 @@ paths:
           description: Existing vote removed
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
+        "400":
+          description: Invalid request or vote on a visible non-approved post
   /api/v1/vaults/add:
     post:
       tags:
       - vault-controller
       operationId: addToVault
-      description: Request post_id is a post version database row id, not logical post_id. Deleted posts are inaccessible.
+      description: Request post_id is a post version database row id, not logical post_id. Parent post must be readable; saved entry belongs to authenticated user.
       requestBody:
         content:
           application/json:
@@ -522,6 +1262,12 @@ paths:
                 $ref: "#/components/schemas/MessageResponse"
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
+        "400":
+          description: Invalid request
+        "409":
+          description: Post already saved by current user
   /api/v1/user:
     get:
       tags:
@@ -679,9 +1425,12 @@ paths:
       tags:
       - file-controller
       operationId: uploadFile
+      description: Owner/admin upload to a post version row. JPEG, PNG or PDF only; at most three files per version, 10 MiB per file and multipart request, and 25000000 decoded pixels per image. Extension, declared MIME and content must agree.
       parameters:
       - name: user_id
         in: query
+        description: Ignored; acting user is the authenticated JWT principal
+        deprecated: true
         required: false
         schema:
           type: integer
@@ -713,8 +1462,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MultipleFileUploadRequest"
+        "400":
+          description: Invalid, empty or mismatched upload
+        "403":
+          description: Visible post may only be modified by owner/admin
         "404":
-          description: Post not found, including deleted posts
+          description: Post missing, deleted or inaccessible
+        "413":
+          description: Upload exceeds 10 MiB limit
+        "415":
+          description: Unsupported media type or file extension
+        "401":
+          description: Authentication required
   /api/v1/departments:
     get:
       tags:
@@ -919,6 +1678,10 @@ paths:
                 format: int32
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
+        "400":
+          description: Invalid request or vote on a visible non-approved post
   /api/v1/votes/{postId}/my-vote:
     get:
       tags:
@@ -943,6 +1706,10 @@ paths:
           description: No current vote
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
+        "400":
+          description: Invalid request or vote on a visible non-approved post
   /api/v1/votes/{postId}/downvotes:
     get:
       tags:
@@ -966,6 +1733,10 @@ paths:
                 format: int32
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
+        "400":
+          description: Invalid request or vote on a visible non-approved post
   /api/v1/vaults/{id}:
     get:
       tags:
@@ -987,12 +1758,14 @@ paths:
                 $ref: "#/components/schemas/VaultResponse"
         "404":
           description: Vault entry not found, including entries of deleted posts
+        "401":
+          description: Authentication required
   /api/v1/vaults/user:
     get:
       tags:
       - vault-controller
       operationId: getUserVault
-      description: Returns saved entries excluding deleted posts; retained entries are hidden, not physically purged.
+      description: Returns current user's saved entries with readable parent posts only; inaccessible retained entries are hidden, not physically purged.
       responses:
         "200":
           description: Saved posts
@@ -1002,6 +1775,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/VaultResponse"
+        "401":
+          description: Authentication required
   /api/v1/vaults/check/{postId}:
     get:
       tags:
@@ -1024,6 +1799,8 @@ paths:
                 type: boolean
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
   /api/v1/user/search:
     get:
       tags:
@@ -1146,7 +1923,7 @@ paths:
       tags:
       - post-controller
       operationId: getPostHistory
-      description: Returns active versions for a logical post_id; deleted posts have an empty history list.
+      description: Returns readable active versions for a logical post_id. Ordinary nonowners see APPROVED versions only; owners/admins also see pending, rejected and superseded versions. Deleted or entirely inaccessible history is an empty array.
       parameters:
       - name: postId
         in: path
@@ -1205,7 +1982,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/FileUploadRequest"
         "404":
-          description: File not found, including files of deleted posts
+          description: File missing or parent post deleted/inaccessible
+        "401":
+          description: Authentication required
   /api/v1/files/download/{id}:
     get:
       tags:
@@ -1220,14 +1999,32 @@ paths:
           format: int64
       responses:
         "200":
-          description: OK
+          description: Attachment from a readable parent post
+          headers:
+            Cache-Control:
+              style: simple
+              schema:
+                type: string
+                enum: [no-store]
+            X-Content-Type-Options:
+              style: simple
+              schema:
+                type: string
+                enum: [nosniff]
+            Content-Disposition:
+              description: attachment with sanitized filename
+              style: simple
+              schema:
+                type: string
           content:
             '*/*':
               schema:
                 type: string
                 format: binary
         "404":
-          description: File not found, including files of deleted posts
+          description: File missing or parent post deleted/inaccessible
+        "401":
+          description: Authentication required
   /api/v1/admin/users:
     get:
       tags:
@@ -1297,6 +2094,10 @@ paths:
           description: Vote removed
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
+        "400":
+          description: Invalid request or vote on a visible non-approved post
   /api/v1/vaults/remove:
     delete:
       tags:
@@ -1319,6 +2120,8 @@ paths:
                 $ref: "#/components/schemas/MessageResponse"
         "404":
           description: Post not found, including deleted posts
+        "401":
+          description: Authentication required
   /api/v1/schools/delete/{id}:
     delete:
       tags:
@@ -1363,14 +2166,224 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    AnnouncementRequest:
+      type: object
+      properties:
+        title: {type: string, maxLength: 128, minLength: 0}
+        body: {type: [string, 'null'], maxLength: 4096, minLength: 0}
+        url: {type: [string, 'null'], maxLength: 2048, minLength: 0}
+        priority: {type: [integer, 'null'], format: int32, maximum: 1000, minimum: 0}
+        active: {type: [boolean, 'null']}
+        starts_at: {type: [string, 'null'], format: date-time}
+        ends_at: {type: [string, 'null'], format: date-time}
+      required: [title]
+    AnnouncementResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        title: {type: string}
+        body: {type: [string, 'null']}
+        url: {type: [string, 'null']}
+        priority: {type: integer, format: int32}
+        starts_at: {type: [string, 'null'], format: date-time}
+        ends_at: {type: [string, 'null'], format: date-time}
+    AdminAnnouncementResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        title: {type: string}
+        body: {type: [string, 'null']}
+        url: {type: [string, 'null']}
+        priority: {type: integer, format: int32}
+        active: {type: boolean}
+        starts_at: {type: [string, 'null'], format: date-time}
+        ends_at: {type: [string, 'null'], format: date-time}
+        created_by: {type: integer, format: int64}
+        updated_by: {type: integer, format: int64}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    AnnouncementPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items: {$ref: '#/components/schemas/AdminAnnouncementResponse'}
+        page: {type: integer, format: int32}
+        size: {type: integer, format: int32}
+        total_elements: {type: integer, format: int64}
+        total_pages: {type: integer, format: int64}
+    TrendingPostResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        post_id: {type: integer, format: int32}
+        title: {type: string}
+        user_id: {type: integer, format: int64}
+        department_id: {type: integer, format: int64}
+        approved_at: {type: string, format: date-time}
+        recent_upvotes: {type: integer, format: int64}
+        recent_downvotes: {type: integer, format: int64}
+    TrendingResponse:
+      type: object
+      properties:
+        calculated_at: {type: string, format: date-time}
+        window: {type: string}
+        content:
+          type: array
+          items: {$ref: '#/components/schemas/TrendingPostResponse'}
+    AuditEventPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items: {$ref: '#/components/schemas/AuditEventResponse'}
+        page: {type: integer, format: int32}
+        size: {type: integer, format: int32}
+        total_elements: {type: integer, format: int64}
+        total_pages: {type: integer, format: int64}
+    AuditEventResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        actor_id: {type: [integer, 'null'], format: int64}
+        action: {type: string}
+        target_type: {type: string}
+        target_id: {type: [integer, 'null'], format: int64}
+        outcome: {type: string}
+        occurred_at: {type: string, format: date-time}
+        correlation_id: {type: string}
+        metadata:
+          type: object
+          additionalProperties: {}
+    AdminDashboardResponse:
+      type: object
+      properties:
+        calculated_at: {type: string, format: date-time}
+        timezone: {type: string}
+        from: {type: string, format: date-time}
+        to: {type: string, format: date-time}
+        users: {$ref: '#/components/schemas/Users'}
+        posts: {$ref: '#/components/schemas/Posts'}
+        moderation: {$ref: '#/components/schemas/Moderation'}
+        engagement: {$ref: '#/components/schemas/Engagement'}
+    Users:
+      type: object
+      properties:
+        active: {type: integer, format: int64}
+        deleted: {type: integer, format: int64}
+        by_role:
+          type: object
+          additionalProperties: {type: integer, format: int64}
+    Posts:
+      type: object
+      properties:
+        active: {type: integer, format: int64}
+        deleted: {type: integer, format: int64}
+        by_status:
+          type: object
+          additionalProperties: {type: integer, format: int64}
+        created_in_period: {type: integer, format: int64}
+        approved_versions_in_period: {type: integer, format: int64}
+        legacy_approved_versions_without_date: {type: integer, format: int64}
+    Moderation:
+      type: object
+      properties:
+        pending: {type: integer, format: int64}
+    Engagement:
+      type: object
+      properties:
+        attachments: {type: integer, format: int64}
+        attachment_bytes: {type: integer, format: int64}
+        attachments_without_known_size: {type: integer, format: int64}
+        upvotes: {type: integer, format: int64}
+        downvotes: {type: integer, format: int64}
+        vault_saves: {type: integer, format: int64}
+    UserStatsResponse:
+      type: object
+      properties:
+        approved_post_count:
+          type: integer
+          format: int64
+          description: Distinct logical posts with approved/latest/non-deleted version rows
+          minimum: 0
+        upvotes_received:
+          type: integer
+          format: int64
+          description: Stored upvotes on eligible version rows
+          minimum: 0
+        downvotes_received:
+          type: integer
+          format: int64
+          description: Stored downvotes on eligible version rows
+          minimum: 0
+    SubjectStatsResponse:
+      type: object
+      properties:
+        approved_post_count:
+          type: integer
+          format: int64
+          description: Distinct logical posts with approved/latest/non-deleted version rows linked to this subject
+          minimum: 0
+        last_approved_post_at:
+          type: [string, 'null']
+          format: date-time
+          description: Latest eligible Post.updated_at in its existing stored clock; null when empty
+    PasswordRecoveryRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          minLength: 0
+          pattern: '^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+    PasswordResetRequest:
+      type: object
+      required: [new_password, token]
+      properties:
+        token:
+          type: string
+          maxLength: 43
+          minLength: 43
+          pattern: '[A-Za-z0-9_-]{43}'
+          writeOnly: true
+        new_password:
+          type: string
+          maxLength: 72
+          minLength: 8
+          writeOnly: true
+    ApiErrorResponse:
+      type: object
+      required: [error, message, status, timestamp]
+      properties:
+        timestamp: {type: string}
+        status: {type: integer, format: int32}
+        error: {type: string}
+        message: {type: string}
+    PostSearchResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostResponse'
+        page: {type: integer, format: int32}
+        size: {type: integer, format: int32}
+        sort: {type: string}
+        total_elements: {type: integer, format: int64}
+        total_pages: {type: integer, format: int64}
     EditVaultLabelRequest:
       type: object
       properties:
-        postId:
+        post_id:
           type: integer
           format: int64
-        newLabel:
+        new_label:
           type: string
+          maxLength: 255
+          minLength: 0
+      required: [post_id]
     VaultResponse:
       type: object
       properties:
@@ -1416,7 +2429,7 @@ components:
           type: array
           items:
             type: string
-        departmentIds:
+        department_ids:
           type: array
           items:
             type: integer
@@ -1447,6 +2460,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DepartmentResponse"
+        created_at:
+          type: string
+          format: date-time
+          description: UTC creation time; deployment-time approximation for legacy subjects
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          description: UTC last modification time
+          readOnly: true
     SchoolRequest:
       type: object
       properties:
@@ -1464,6 +2487,31 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DepartmentResponse"
+    PostLinkRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          maxLength: 2048
+          description: Absolute HTTP(S) display URL; no credentials, controls or whitespace
+        label:
+          type: [string, 'null']
+          maxLength: 200
+          description: Optional plain-text label; blank becomes null
+    PostLinkResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        label:
+          type: [string, 'null']
+        position:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 9
+          description: Zero-based submitted order within this version
     PostUpdateRequest:
       type: object
       properties:
@@ -1473,7 +2521,14 @@ components:
           minLength: 0
         content:
           type: string
-        postTag:
+        links:
+          type: [array, 'null']
+          description: Ordered HTTP(S) links, maximum 10. Omitted/null copies source version links; [] clears only the new version; canonical duplicates reject the request.
+          items:
+            $ref: '#/components/schemas/PostLinkRequest'
+          maxItems: 10
+          minItems: 0
+        post_tag:
           type: string
     PostUpdateResponse:
       type: object
@@ -1530,11 +2585,13 @@ components:
     VoteRequest:
       type: object
       properties:
-        postId:
+        post_id:
           type: integer
           format: int64
-        voteType:
+        vote_type:
           type: string
+          pattern: UPVOTE|DOWNVOTE
+      required: [post_id, vote_type]
     VoteResponse:
       type: object
       properties:
@@ -1552,11 +2609,14 @@ components:
     VaultRequest:
       type: object
       properties:
-        postId:
+        post_id:
           type: integer
           format: int64
         label:
           type: string
+          maxLength: 255
+          minLength: 0
+      required: [post_id]
     RegisterRequest:
       type: object
       properties:
@@ -1578,17 +2638,26 @@ components:
         content:
           type: string
           minLength: 1
-        userId:
+        links:
+          type: [array, 'null']
+          description: Optional ordered HTTP(S) links, maximum 10. Omitted/null creates no links; canonical duplicates reject the request.
+          items:
+            $ref: '#/components/schemas/PostLinkRequest'
+          maxItems: 10
+          minItems: 0
+        user_id:
           type: integer
           format: int64
-        departmentId:
+          deprecated: true
+          description: Ignored legacy ownership input; owner is always the authenticated JWT principal
+        department_id:
           type: integer
           format: int64
-        postTag:
+        post_tag:
           type: string
       required:
       - content
-      - departmentId
+      - department_id
       - title
     PostCreateResponse:
       type: object
@@ -1653,7 +2722,7 @@ components:
     RefreshTokenRequest:
       type: object
       properties:
-        refreshToken:
+        refresh_token:
           type: string
     AuthResponse:
       type: object
@@ -1710,6 +2779,16 @@ components:
           type: string
         reason:
           type: string
+    CoverPictureResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        cover_picture:
+          type: string
+        message:
+          type: string
     UserResponse:
       type: object
       properties:
@@ -1734,6 +2813,20 @@ components:
           type: string
         profile_picture:
           type: string
+        cover_picture:
+          type: string
+          description: Optional relative cover storage key; retrieve bytes from GET /api/v1/user/{userId}/cover-picture
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          description: UTC creation time; deployment-time approximation for legacy users
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          description: UTC last modification time
+          readOnly: true
     UserSummaryResponse:
       type: object
       properties:
@@ -1752,6 +2845,16 @@ components:
           type: string
         profile_picture:
           type: string
+        created_at:
+          type: string
+          format: date-time
+          description: UTC creation time; deployment-time approximation for legacy users
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          description: UTC last modification time
+          readOnly: true
     FileResponse:
       type: object
       properties:
@@ -1821,6 +2924,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FileResponse"
+        links:
+          type: array
+          description: Ordered links belonging to this version; empty array for none
+          items:
+            $ref: '#/components/schemas/PostLinkResponse'
         is_latest_version:
           type: boolean
     PostSubjectResponse:

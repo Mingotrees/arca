@@ -18,12 +18,13 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-/** Runs before security so denied DELETE requests are observable too. */
+/** Runs before security so denied post, profile-statistics and recovery requests are observable too. */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class PostDeletionObservationFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(PostDeletionObservationFilter.class);
     private static final Pattern DELETE_PATH = Pattern.compile("/api/v1/posts/[^/]+");
+    private static final Pattern PROFILE_STATS_PATH = Pattern.compile("/api/v1/(user|subject)/[^/]+/stats");
     private static final Pattern SAFE_CORRELATION = Pattern.compile("[A-Za-z0-9._-]{1,64}");
     private final MeterRegistry meters;
 
@@ -34,19 +35,36 @@ public class PostDeletionObservationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        return !"DELETE".equals(request.getMethod()) || !DELETE_PATH.matcher(path).matches();
+        boolean deletion = "DELETE".equals(request.getMethod()) && DELETE_PATH.matcher(path).matches();
+        boolean search = "GET".equals(request.getMethod()) && "/api/v1/posts/search".equals(path);
+        boolean recovery = "POST".equals(request.getMethod()) &&
+                ("/api/v1/auth/password-recovery".equals(path) || "/api/v1/auth/password-reset".equals(path));
+        boolean statistics = "GET".equals(request.getMethod()) && PROFILE_STATS_PATH.matcher(path).matches();
+        return !deletion && !search && !recovery && !statistics;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String submitted = request.getHeader("X-Request-ID");
-        String correlation = submitted != null && SAFE_CORRELATION.matcher(submitted).matches()
-                ? submitted : UUID.randomUUID().toString();
+        String correlation = MDC.get("correlation_id") != null ? MDC.get("correlation_id")
+                : submitted != null && SAFE_CORRELATION.matcher(submitted).matches() ? submitted : UUID.randomUUID().toString();
         String previous = MDC.get("correlation_id");
         MDC.put("correlation_id", correlation);
         response.setHeader("X-Request-ID", correlation);
         Timer.Sample sample = Timer.start(meters);
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        String event;
+        String metric;
+        if (path.equals("/api/v1/auth/password-recovery")) { event = "password_recovery"; metric = "arca.auth.password.recovery"; }
+        else if (path.equals("/api/v1/auth/password-reset")) { event = "password_reset"; metric = "arca.auth.password.reset"; }
+        else if (PROFILE_STATS_PATH.matcher(path).matches()) {
+            boolean user = path.startsWith("/api/v1/user/");
+            event = user ? "user_stats" : "subject_stats";
+            metric = user ? "arca.profile.user.stats" : "arca.profile.subject.stats";
+        }
+        else if ("GET".equals(request.getMethod())) { event = "post_search"; metric = "arca.post.search"; }
+        else { event = "post_delete"; metric = "arca.post.deletion"; }
         boolean failed = false;
         try {
             chain.doFilter(request, response);
@@ -56,12 +74,12 @@ public class PostDeletionObservationFilter extends OncePerRequestFilter {
         } finally {
             int status = failed ? 500 : response.getStatus();
             String outcome = status < 400 ? "success" : status < 500 ? "rejected" : "error";
-            long nanos = sample.stop(Timer.builder("arca.post.deletion")
-                    .description("Post deletion request outcomes and latency, including authorization failures")
+            long nanos = sample.stop(Timer.builder(metric)
+                    .description("Request outcomes and latency, including authorization failures")
                     .tags("status", Integer.toString(status), "outcome", outcome).register(meters));
             // Never log raw paths, request bodies, headers, or credentials.
-            log.info("post_delete outcome={} status={} correlation_id={} duration_ms={}",
-                    outcome, status, correlation, nanos / 1_000_000.0);
+            log.info("{} outcome={} status={} correlation_id={} duration_ms={}",
+                    event, outcome, status, correlation, nanos / 1_000_000.0);
             if (previous == null) MDC.remove("correlation_id");
             else MDC.put("correlation_id", previous);
         }

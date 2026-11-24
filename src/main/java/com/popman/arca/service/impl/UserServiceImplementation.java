@@ -5,6 +5,12 @@ import com.popman.arca.dto.v1.user.UserUpdateRequest;
 import com.popman.arca.entity.User;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.UserService;
+import com.popman.arca.service.audit.AuditService;
+import static com.popman.arca.service.audit.AuditAction.*;
+import com.popman.arca.service.media.UploadValidator;
+import com.popman.arca.service.media.MediaStorage;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import jakarta.transaction.Transactional;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
@@ -31,13 +37,17 @@ public class UserServiceImplementation implements UserService {
   private static final Logger logger = LoggerFactory.getLogger(UserServiceImplementation.class);
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
+  private final AuditService audit;
+  private final UploadValidator uploadValidator = new UploadValidator();
+  private final MediaStorage mediaStorage = new MediaStorage();
 
   @Value("${file.upload-dir:uploads}")
   private String uploadDir;
 
-  public UserServiceImplementation(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+  public UserServiceImplementation(UserRepository userRepository, PasswordEncoder passwordEncoder, AuditService audit) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
+    this.audit = audit;
   }
 
   @Override
@@ -128,6 +138,7 @@ public class UserServiceImplementation implements UserService {
       User savedUser = userRepository.save(user);
       logger.info("Admin created successfully with ID: {} and roles: {}",
           savedUser.getId(), savedUser.getRoles());
+      audit.success(ADMIN_CREATED, savedUser.getId());
 
       return "Admin created successfully with ID: " + savedUser.getId();
     } catch (IllegalArgumentException e) {
@@ -155,6 +166,7 @@ public class UserServiceImplementation implements UserService {
 
       user.addRole("ROLE_ADMIN");
       userRepository.save(user);
+      audit.roleChanged(ROLE_ADDED, userId, "ROLE_ADMIN");
 
       logger.info("User {} promoted to admin successfully", userId);
       return "User promoted to admin successfully";
@@ -187,6 +199,7 @@ public class UserServiceImplementation implements UserService {
 
       user.removeRole("ROLE_ADMIN");
       userRepository.save(user);
+      audit.roleChanged(ROLE_REMOVED, userId, "ROLE_ADMIN");
 
       logger.info("User {} demoted from admin successfully", userId);
       return "User demoted from admin successfully";
@@ -216,6 +229,7 @@ public class UserServiceImplementation implements UserService {
 
       user.addRole(role);
       userRepository.save(user);
+      audit.roleChanged(ROLE_ADDED, userId, role);
 
       logger.info("Role {} added to user {} successfully", role, userId);
       return "Role added successfully";
@@ -249,6 +263,7 @@ public class UserServiceImplementation implements UserService {
 
       user.removeRole(role);
       userRepository.save(user);
+      audit.roleChanged(ROLE_REMOVED, userId, role);
 
       logger.info("Role {} removed from user {} successfully", role, userId);
       return "Role removed successfully";
@@ -262,74 +277,95 @@ public class UserServiceImplementation implements UserService {
   }
 
   @Override
+  @Transactional
   public String updateProfilePictureV1(Long userId, MultipartFile file) {
+    return updatePicture(userId, file, false);
+  }
+
+  @Override
+  @Transactional
+  public String updateCoverPictureV1(Long userId, MultipartFile file) {
+    return updatePicture(userId, file, true);
+  }
+
+  private String updatePicture(Long userId, MultipartFile file, boolean cover) {
+    Path target = null;
+    String directory = cover ? "cover-pictures" : "profile-pictures";
     try {
       validateId(userId);
-
-      if (file == null || file.isEmpty()) {
-        throw new IllegalArgumentException("File must not be null or empty");
+      var upload = uploadValidator.validate(file, true);
+      User user = userRepository.findByIdForUpdate(userId)
+          .orElseThrow(() -> new NoSuchElementException("User not found"));
+      String filename = java.util.UUID.randomUUID() + upload.extension();
+      String relativePath = directory + "/" + filename;
+      target = mediaStorage.destination(uploadDir, directory, filename);
+      Files.write(target, upload.bytes(), java.nio.file.StandardOpenOption.CREATE_NEW);
+      Path written = target;
+      String oldPath = cover ? user.getCoverPicture() : user.getProfilePicture();
+      boolean synchronizedTransaction = TransactionSynchronizationManager.isSynchronizationActive();
+      if (synchronizedTransaction) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+          @Override public void afterCommit() { deleteOldPicture(oldPath, directory); }
+          @Override public void afterCompletion(int status) {
+            if (status != STATUS_COMMITTED) cleanupProfilePicture(written);
+          }
+        });
       }
-
-      String contentType = file.getContentType();
-      if (contentType == null || !(contentType.equals("image/jpeg")
-          || contentType.equals("image/png")
-          || contentType.equals("image/webp"))) {
-        throw new IllegalArgumentException("Only image/jpeg, image/png, or image/webp allowed");
-      }
-      byte[] bytes = file.getBytes();
-      if (!hasImageSignature(bytes, contentType)) {
-        throw new IllegalArgumentException("Profile picture content does not match its media type");
-      }
-
-      User user = userRepository.findById(userId)
-          .orElseThrow(() -> new NoSuchElementException("User not found with ID: " + userId));
-
-      String ext = extensionForContentType(contentType);
-      String fileName = "user_" + userId + "_" + System.currentTimeMillis() + "." + ext;
-
-      String relativePath = Paths.get("profile-pictures", fileName).toString();
-      Path targetLocation = prepareProfilePictureTarget(fileName);
-
-      Files.write(targetLocation, bytes);
-
-      String oldPathStr = user.getProfilePicture();
-      if (oldPathStr != null && !oldPathStr.trim().isEmpty()) {
-        try {
-          deleteStoredProfilePicture(oldPathStr);
-        } catch (Exception ex) {
-          logger.warn("Failed to delete old profile picture for user {}: {}", userId, ex.getMessage());
-        }
-      }
-
-      user.setProfilePicture(relativePath);
-      userRepository.save(user);
-
-      logger.info("Updated profile picture for user {} -> {}", userId, relativePath);
+      if (cover) user.setCoverPicture(relativePath);
+      else user.setProfilePicture(relativePath);
+      userRepository.saveAndFlush(user);
+      audit.success(cover ? COVER_CHANGED : AVATAR_CHANGED, userId);
+      if (!synchronizedTransaction) deleteOldPicture(oldPath, directory);
       return relativePath;
-    } catch (IllegalArgumentException | NoSuchElementException e) {
-      throw e;
     } catch (IOException e) {
-      logger.error("IO error updating profile picture for {}: {}", userId, e.getMessage());
-      throw new RuntimeException("Failed to save profile picture", e);
-    } catch (Exception e) {
-      logger.error("Error updating profile picture for {}: {}", userId, e.getMessage());
-      throw new RuntimeException("Failed to update profile picture", e);
+      if (target != null) cleanupProfilePicture(target);
+      throw new RuntimeException("Failed to save " + (cover ? "cover" : "profile") + " picture", e);
+    } catch (RuntimeException e) {
+      if (target != null) cleanupProfilePicture(target);
+      throw e;
     }
   }
 
   @Override
   public ProfilePictureContent getProfilePictureV1(Long userId) {
+    return getPicture(userId, false);
+  }
+
+  @Override
+  public ProfilePictureContent getCoverPictureV1(Long userId) {
+    return getPicture(userId, true);
+  }
+
+  @Override
+  @Transactional
+  public void deleteCoverPictureV1(Long userId) {
+    validateId(userId);
+    User user = userRepository.findByIdForUpdate(userId)
+        .orElseThrow(() -> new NoSuchElementException("User not found"));
+    String oldPath = user.getCoverPicture();
+    if (oldPath == null) return;
+    user.setCoverPicture(null);
+    userRepository.saveAndFlush(user);
+    audit.success(COVER_REMOVED, userId);
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+        @Override public void afterCommit() { deleteOldPicture(oldPath, "cover-pictures"); }
+      });
+    } else deleteOldPicture(oldPath, "cover-pictures");
+  }
+
+  private ProfilePictureContent getPicture(Long userId, boolean cover) {
     validateId(userId);
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new NoSuchElementException("User not found with ID: " + userId));
 
-    String storedPath = user.getProfilePicture();
+    String storedPath = cover ? user.getCoverPicture() : user.getProfilePicture();
     if (storedPath == null || storedPath.isBlank()) {
       throw new NoSuchElementException("Profile picture not found");
     }
 
     try {
-      Path candidate = resolveStoredProfilePicture(storedPath);
+      Path candidate = mediaStorage.existing(uploadDir, storedPath, cover ? "cover-pictures" : "profile-pictures");
       if (!Files.isRegularFile(candidate, LinkOption.NOFOLLOW_LINKS)) {
         throw new NoSuchElementException("Profile picture not found");
       }
@@ -387,11 +423,10 @@ public class UserServiceImplementation implements UserService {
       logger.debug("Deleting user with Id: {}", userId);
       validateId(userId);
 
-      if (!userRepository.existsById(userId)) {
-        throw new IllegalArgumentException("User does not exist or is already deleted");
-      }
-
-      userRepository.deleteById(userId);
+      User user = userRepository.findByIdForUpdate(userId)
+          .orElseThrow(() -> new IllegalArgumentException("User does not exist or is already deleted"));
+      userRepository.delete(user);
+      audit.success(USER_DELETED, userId);
       logger.info("User with ID {} deleted successfully (soft delete)", userId);
       return "User deleted successfully";
 
@@ -461,65 +496,18 @@ public class UserServiceImplementation implements UserService {
     }
   }
 
-  private Path resolveUnderUploadRoot(String relativePath) {
-    Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
-    Path resolved = root.resolve(relativePath).normalize();
-    if (!resolved.startsWith(root)) {
-      throw new IllegalArgumentException("Invalid profile picture path");
+  private void deleteOldPicture(String storedPath, String directory) {
+    if (storedPath == null || storedPath.isBlank()) return;
+    try {
+      Files.deleteIfExists(mediaStorage.existing(uploadDir, storedPath, directory));
+    } catch (IOException | InvalidPathException | SecurityException e) {
+      logger.warn("Could not remove previous user image");
     }
-    return resolved;
   }
 
-  private Path prepareProfilePictureTarget(String fileName) throws IOException {
-    Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
-    Files.createDirectories(root);
-    Path realRoot = root.toRealPath();
-
-    Path profileDirectory = root.resolve("profile-pictures");
-    Files.createDirectories(profileDirectory);
-    Path realProfileDirectory = profileDirectory.toRealPath();
-    if (!realProfileDirectory.startsWith(realRoot)) {
-      throw new IOException("Profile picture directory is outside upload root");
-    }
-
-    Path target = realProfileDirectory.resolve(fileName).normalize();
-    if (!target.startsWith(realProfileDirectory)) {
-      throw new IOException("Invalid profile picture target");
-    }
-    return target;
-  }
-
-  private void deleteStoredProfilePicture(String storedPath) throws IOException {
-    Path candidate = resolveStoredProfilePicture(storedPath);
-    if (!Files.exists(candidate, LinkOption.NOFOLLOW_LINKS)) {
-      return;
-    }
-    Files.deleteIfExists(candidate);
-  }
-
-  private Path resolveStoredProfilePicture(String storedPath) throws IOException {
-    Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
-    Path profileDirectory = root.resolve("profile-pictures").normalize();
-    Path candidate = root.resolve(storedPath).normalize();
-    if (!candidate.startsWith(profileDirectory)) {
-      throw new IOException("Stored profile picture is outside profile picture directory");
-    }
-
-    Path realProfileDirectory = profileDirectory.toRealPath();
-    Path realCandidate = candidate.toRealPath();
-    if (!realCandidate.startsWith(realProfileDirectory)) {
-      throw new IOException("Stored profile picture is outside profile picture directory");
-    }
-    return realCandidate;
-  }
-
-  private String extensionForContentType(String contentType) {
-    return switch (contentType) {
-      case "image/jpeg" -> "jpg";
-      case "image/png" -> "png";
-      case "image/webp" -> "webp";
-      default -> throw new IllegalArgumentException("Unsupported image content type");
-    };
+  private void cleanupProfilePicture(Path path) {
+    try { Files.deleteIfExists(path); }
+    catch (IOException e) { logger.warn("Could not clean up profile picture"); }
   }
 
   private String contentTypeForExtension(Path path) {
@@ -536,31 +524,4 @@ public class UserServiceImplementation implements UserService {
     throw new NoSuchElementException("Profile picture not found");
   }
 
-  private boolean hasImageSignature(byte[] bytes, String contentType) {
-    return switch (contentType) {
-      case "image/jpeg" -> bytes.length >= 3
-          && (bytes[0] & 0xff) == 0xff
-          && (bytes[1] & 0xff) == 0xd8
-          && (bytes[2] & 0xff) == 0xff;
-      case "image/png" -> startsWith(bytes, new byte[] {
-          (byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
-      });
-      case "image/webp" -> bytes.length >= 12
-          && startsWith(bytes, new byte[] {0x52, 0x49, 0x46, 0x46})
-          && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50;
-      default -> false;
-    };
-  }
-
-  private boolean startsWith(byte[] bytes, byte[] prefix) {
-    if (bytes.length < prefix.length) {
-      return false;
-    }
-    for (int i = 0; i < prefix.length; i++) {
-      if (bytes[i] != prefix[i]) {
-        return false;
-      }
-    }
-    return true;
-  }
 }

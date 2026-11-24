@@ -38,6 +38,8 @@ class UserServiceImplementationTest {
     @InjectMocks
     private UserServiceImplementation userService;
 
+    @Mock private com.popman.arca.service.audit.AuditService audit;
+
     @TempDir
     private Path uploadDir;
 
@@ -129,5 +131,22 @@ class UserServiceImplementationTest {
         user.setEmail(email);
         user.setPassword(password);
         return user;
+    }
+
+    @Test
+    void databaseFailureDuringCoverReplacementPreservesOldFileAndRemovesNewFile() throws Exception {
+        ReflectionTestUtils.setField(userService, "uploadDir", uploadDir.toString());
+        Path old = Files.createDirectories(uploadDir.resolve("cover-pictures")).resolve("old.png");
+        Files.writeString(old, "old bytes");
+        User existing = user("person@example.com", "encoded-password");
+        existing.setCoverPicture("cover-pictures/old.png");
+        when(userRepository.findByIdForUpdate(12L)).thenReturn(Optional.of(existing));
+        when(userRepository.saveAndFlush(existing)).thenThrow(new org.springframework.dao.DataIntegrityViolationException("forced DB failure"));
+        var output = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", output);
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+                () -> userService.updateCoverPictureV1(12L, new MockMultipartFile("file", "cover.png", "image/png", output.toByteArray())));
+        assertEquals("old bytes", Files.readString(old));
+        try (var paths = Files.list(old.getParent())) { assertEquals(1, paths.count()); }
     }
 }

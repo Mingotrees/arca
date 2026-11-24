@@ -4,13 +4,12 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
-import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
@@ -20,8 +19,20 @@ import java.util.function.Function;
 @Service
 public class JWTService {
 
-    @Value("${jwt.secret}")
+    @Value("${jwt.secret:}")
     private String secretKey;
+    private SecretKey signingKey;
+
+    @PostConstruct
+    public void initializeSigningKey() {
+        try {
+            byte[] bytes = Base64.getDecoder().decode(secretKey == null ? "" : secretKey);
+            if (bytes.length < 32) throw new IllegalArgumentException();
+            signingKey = Keys.hmacShaKeyFor(bytes);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("jwt.secret must be Base64 encoding at least 32 secret bytes");
+        }
+    }
 
     @Value("${jwt.access-token-expiration}")
     private long accessTokenExpiration;
@@ -53,8 +64,7 @@ public class JWTService {
     }
 
     private SecretKey getKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return signingKey;
     }
 
     public String extractEmail(String token) {

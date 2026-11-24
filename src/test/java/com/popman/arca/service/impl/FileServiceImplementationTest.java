@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -58,7 +59,7 @@ class FileServiceImplementationTest {
 
     @Test
     void acceptsValidBytesWithNullMimeAndUsesContainedUuidPath() throws Exception {
-        byte[] png = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01};
+        byte[] png = png();
         MockMultipartFile upload = new MockMultipartFile("file", "../my image.png", null, png);
         when(postRepository.findByIdForUpdate(12L)).thenReturn(Optional.of(post));
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
@@ -78,8 +79,8 @@ class FileServiceImplementationTest {
     }
 
     @Test
-    void validatesWholeBatchBeforeWritingAnything() {
-        byte[] png = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+    void validatesWholeBatchBeforeWritingAnything() throws Exception {
+        byte[] png = png();
         MockMultipartFile valid = new MockMultipartFile("file", "valid.png", "image/png", png);
         MockMultipartFile mismatch = new MockMultipartFile(
                 "file", "invalid.pdf", "application/pdf", png);
@@ -92,6 +93,63 @@ class FileServiceImplementationTest {
 
         verify(fileRepository, never()).saveAllAndFlush(anyList());
         assertTrue(Files.notExists(uploadDir.resolve("posts")));
+    }
+
+    @Test
+    void rejectsSignatureOnlyImageBeforeCreatingRowsOrFiles() throws Exception {
+        prepareUpload();
+        var upload = new MockMultipartFile("file", "fake.png", "image/png",
+                new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a});
+        assertThrows(IllegalArgumentException.class, () -> service.uploadFilesV1(List.of(upload), 7L, 12L, false));
+        assertTrue(Files.notExists(uploadDir.resolve("posts")));
+    }
+
+    @Test
+    void rejectsOversizedBytesAndOversizedBatchAtServiceBoundary() throws Exception {
+        prepareUpload();
+        byte[] large = new byte[10 * 1024 * 1024 + 1];
+        System.arraycopy("%PDF-1.7".getBytes(), 0, large, 0, 8);
+        var upload = new MockMultipartFile("file", "large.pdf", "application/pdf", large);
+        assertEquals(413, assertThrows(ResponseStatusException.class,
+                () -> service.uploadFilesV1(List.of(upload), 7L, 12L, false)).getStatusCode().value());
+        var part = new MockMultipartFile("file", "part.pdf", "application/pdf",
+                java.util.Arrays.copyOf(large, 6 * 1024 * 1024));
+        assertEquals(413, assertThrows(ResponseStatusException.class,
+                () -> service.uploadFilesV1(List.of(part, part), 7L, 12L, false)).getStatusCode().value());
+        assertTrue(Files.notExists(uploadDir.resolve("posts")));
+    }
+
+    @Test
+    void rejectsSymlinkedPostDirectoryWithoutWritingOutsideRoot() throws Exception {
+        prepareUpload();
+        Path outside = Files.createDirectory(uploadDir.resolve("outside"));
+        Path root = Files.createDirectory(uploadDir.resolve("storage"));
+        Files.createSymbolicLink(root.resolve("posts"), outside);
+        ReflectionTestUtils.setField(service, "uploadDir", root.toString());
+        var upload = new MockMultipartFile("file", "test.pdf", "application/pdf", "%PDF-1.7".getBytes());
+        assertThrows(java.io.IOException.class, () -> service.uploadFilesV1(List.of(upload), 7L, 12L, false));
+        try (var paths = Files.list(outside)) { assertEquals(0, paths.count()); }
+    }
+
+    @Test
+    void rejectsImagePixelBombBeforeDecoding() throws Exception {
+        prepareUpload();
+        byte[] bytes = png();
+        java.nio.ByteBuffer.wrap(bytes).putInt(16, 100_000).putInt(20, 100_000);
+        var upload = new MockMultipartFile("file", "bomb.png", "image/png", bytes);
+        assertThrows(IllegalArgumentException.class, () -> service.uploadFilesV1(List.of(upload), 7L, 12L, false));
+        assertTrue(Files.notExists(uploadDir.resolve("posts")));
+    }
+
+    private void prepareUpload() {
+        when(postRepository.findByIdForUpdate(12L)).thenReturn(Optional.of(post));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+    }
+
+    private byte[] png() throws Exception {
+        var output = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", output);
+        return output.toByteArray();
     }
 
     @Test

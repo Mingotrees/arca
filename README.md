@@ -17,10 +17,15 @@ Arca is a REST API for sharing academic posts and attachments, organized by scho
 ## Features
 
 - **Accounts and profiles** — registration, login, JWT access tokens, persisted refresh sessions, BCrypt passwords, profile editing, avatars, and user search.
+- **Profile metadata and statistics** — UTC user/subject timestamps and authenticated aggregate profile endpoints, with approved/latest/non-deleted post eligibility.
+- **Password recovery** — configurable email reset links, hashed single-use tokens, refresh-session revocation and database-backed rate limits; enable after SMTP/frontend setup.
 - **Academic taxonomy** — schools, departments, subjects, aliases, and administrator-managed relationships.
 - **Versioned posts** — approval/rejection queues, revision history, owner/admin edits, and logical-post soft deletion that hides every version while retaining stored data.
+- **Post discovery** — full-text title/content search, combined subject/department/author/date filters, deterministic sorts, and bounded pagination through `/api/v1/posts/search`.
 - **Resource sharing** — JPEG, PNG, and PDF post attachments, authenticated downloads, upvotes/downvotes, and labeled vault entries.
-- **Administration** — account and role management, user soft deletion, and banned-email controls.
+- **Resource security** — shared post visibility checks, bounded content-validated uploads, canonical storage containment, transactional avatar replacement, and startup JWT/CORS validation.
+- **Administration** — account and role management, user soft deletion, banned-email controls, admin-only dashboard aggregates, and transaction-aware audit history.
+- **Optional homepage modules** — scheduled global announcements and recent-vote/approval-age trending, independently feature-flagged off by default.
 - **Operational tooling** — Flyway migrations, OpenAPI documentation, MySQL-backed integration tests, correlated deletion logs, and admin-only health/metrics endpoints.
 
 Built with **Java 21**, **Spring Boot 3.5.5**, **Spring MVC**, **Spring Data JPA**, **Spring Security**, and **MySQL 8.4**. The application connects using the MariaDB JDBC driver.
@@ -61,6 +66,7 @@ USER_PASSWORD=local-framework-password
 ```
 
 Generate the `SECRET_KEY` value with `openssl rand -base64 32` and paste it into `.env`. It must decode to at least 32 random bytes. These example passwords are for local development only; `.env` is ignored by Git.
+Startup rejects missing, malformed or undersized signing secrets. Keep a deployment's existing valid secret to preserve issued JWTs.
 
 Token lifetimes are **milliseconds**: the examples above mean 15 minutes and 7 days. `USER_NAME`/`USER_PASSWORD` populate existing Spring Security framework settings; they do **not** create an Arca account or admin user.
 
@@ -71,7 +77,7 @@ docker compose -p arca up -d --wait mysql
 ./mvnw spring-boot:run
 ```
 
-Compose starts **only MySQL**, bound to `127.0.0.1:3306`, with a persistent database volume. The application loads `.env` from the repository root and defaults to the `dev` profile. On an empty database, Flyway applies V1–V3 before Hibernate validates the schema.
+Compose starts **only MySQL**, bound to `127.0.0.1:3306`, with a persistent database volume. The application loads `.env` from the repository root and defaults to the `dev` profile. On an empty database, Flyway applies V1–V11 before Hibernate validates the schema.
 
 | Service | Local URL |
 | --- | --- |
@@ -107,13 +113,20 @@ Registration grants `ROLE_USER`. A fresh database has no seeded admin account or
 
 ## API
 
-Most `/api/v1` routes require `Authorization: Bearer <access_token>`. Authentication routes and profile-picture reads are public; moderation, taxonomy mutations, and `/api/v1/admin/**` require `ROLE_ADMIN`. JSON uses `snake_case`.
+Most `/api/v1` routes require `Authorization: Bearer <access_token>`. Authentication routes and profile-picture/cover-picture reads are public; moderation, taxonomy mutations, and `/api/v1/admin/**` require `ROLE_ADMIN`. JSON uses `snake_case`.
 
 | Area | Routes |
 | --- | --- |
 | Authentication | `/api/v1/auth/register`, `/login`, `/refresh`, `/logout` under the auth prefix |
-| Profiles | `/api/v1/user/me`, `/api/v1/user/search`, `/api/v1/user/{userId}/profile-picture` |
+| Password recovery | `/api/v1/auth/password-recovery`, `/api/v1/auth/password-reset` — anonymous, enabled after provider configuration |
+| Profiles | `/api/v1/user/me`, `/api/v1/user/search`, `/api/v1/user/{userId}/profile-picture`, `/api/v1/user/{userId}/cover-picture` |
+| Profile statistics | `/api/v1/user/{userId}/stats`, `/api/v1/subject/{subjectId}/stats` — aggregate DTOs, authenticated profile access |
 | Posts | `/api/v1/posts`, `/mine`, `/subject/{subjectId}`, `/department/{departmentId}`, `/user/{userId}` under the posts prefix |
+| Post links | Optional ordered `links` on post create/update; version-owned responses, HTTP(S)-only, no server-side fetching. [Contract and V8 rollout](docs/phase-7-operations.md) |
+| Admin dashboard | `GET /api/v1/admin/dashboard`: current aggregates and bounded UTC creation/approval activity. [Definitions and V9 rollout](docs/phase-8-operations.md) |
+| Audit events | `GET /api/v1/admin/audit-events`: admin-only filtered paging/export, transactional mutation records. [Action matrix, V10, retention and grants](docs/phase-9-operations.md) |
+| Homepage modules | `/api/v1/admin/announcements`, `/api/v1/announcements/active`, `/api/v1/posts/trending`; set `ANNOUNCEMENTS_ENABLED` / `TRENDING_ENABLED` independently. [Contracts and V11 rollout](docs/phase-10-operations.md) |
+| Search | `/api/v1/posts/search` — combined filters and stable paged results; legacy lists remain arrays |
 | Moderation and history | `/api/v1/posts/pending`, `/api/v1/posts/{postId}/approve`, `/api/v1/posts/history/{postId}` |
 | Attachments | `/api/v1/files/upload`, `/api/v1/files/{id}`, `/api/v1/files/download/{id}` |
 | Votes and vaults | `/api/v1/votes/**`, `/api/v1/vaults/**` |
@@ -123,6 +136,14 @@ Most `/api/v1` routes require `Authorization: Bearer <access_token>`. Authentica
 > A post's **`id` identifies one version row**; **`post_id` identifies the logical post across versions**. Read/edit/delete, moderation, attachment uploads, votes, and vault operations use the version row ID. History uses the logical `post_id`. Deleting any version hides every version and returns `204 No Content`; rows and files remain retained.
 
 Use [openapi.yaml](openapi.yaml) and the running Swagger UI for request/response contracts. [API_DOCUMENTATION.md](API_DOCUMENTATION.md) provides additional examples; some legacy examples predate the current contract. Post lists currently return unpaged arrays. Posts start in `PENDING_APPROVAL`, titles are limited to 30 characters, and post attachments are limited to three JPEG/PNG/PDF files per version. Default multipart limits are 10 MB per file **and per request**.
+
+Owners/admins can read active private versions; other authenticated users see approved versions only, including through history, files, votes, and vaults. Missing/deleted/inaccessible posts return 404. Uploads enforce extension/MIME/content agreement, 10 MiB byte limits and 25 million decoded pixels; avatar uploads also support WebP. See [Phase 2 operations](docs/phase-2-operations.md) for the visibility matrix, multipart overhead, storage lifecycle and production configuration.
+
+Search supports `q`, `subject_id`, `department_id`, `author_id`, local `created_at` date bounds `from`/`to`, and sorts `newest`, `oldest`, `relevance`, `vote_score`. Pages start at 0, default size is 20, maximum 100. Default results are approved/latest/non-deleted for all roles; explicit moderation-status filtering is admin-only. See [Phase 3 operations](docs/phase-3-operations.md) for tokenization, date semantics, V4 rollout and observed query plans.
+
+Password recovery defaults disabled (new routes return 503) until reset URL, sender, separate rate-key secret and SMTP are configured. Requests use a generic 202; email links expire after 15 minutes by default. Completion accepts `token` and `new_password`, revokes every refresh session and requires fresh login; existing access JWTs keep normal remaining lifetime. See [Phase 4 operations](docs/phase-4-operations.md) for configuration, proxy/rate policy and delivery/retention behavior.
+
+User/subject responses append optional UTC `created_at`/`updated_at` instants. Preexisting creation times use a migration-time approximation recorded internally. Profile statistics count approved/latest/non-deleted logical posts and eligible version-row votes; subject approval time follows existing stored Post.updated_at semantics. See [Phase 5 operations](docs/phase-5-operations.md) for exact definitions, V6 backfill and SQL-maintenance rules.
 
 ## Development
 
@@ -184,7 +205,7 @@ Deletion requests expose a safe `X-Request-ID`, content-free outcome logs, and t
 
 ## Roadmap
 
-[The backend roadmap](docs/arca-backend-roadmap.md) defines additive work on the existing `/api/v1` architecture. Phase 1 delivers soft deletion and migration foundations. Later phases cover shared authorization hardening, post search/pagination, password recovery, richer profiles, structured links, admin aggregates, and audit events. Announcements and trending are optional; server-side draft persistence is outside the current backend scope.
+[The backend roadmap](docs/arca-backend-roadmap.md) defines additive work on the existing `/api/v1` architecture. Phases 1–5 deliver soft deletion/migrations, shared authorization/media hardening, post search/pagination, password recovery, and profile timestamps/statistics. Next phases cover profile covers, structured links, admin aggregates, and audit events. Announcements and trending are optional; server-side draft persistence is outside the current backend scope.
 
 ## Troubleshooting
 

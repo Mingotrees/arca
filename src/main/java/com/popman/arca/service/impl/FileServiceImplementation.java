@@ -7,6 +7,10 @@ import com.popman.arca.repository.FileRepository;
 import com.popman.arca.repository.PostRepository;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.FileService;
+import com.popman.arca.service.PostAccessPolicy;
+import com.popman.arca.service.media.UploadValidator;
+import com.popman.arca.service.media.UploadValidator.ValidatedUpload;
+import com.popman.arca.service.media.MediaStorage;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +41,9 @@ public class FileServiceImplementation implements FileService {
 
   private static final Logger logger = LoggerFactory.getLogger(FileServiceImplementation.class);
   private static final int MAX_FILES_PER_POST = 3;
+  private final PostAccessPolicy accessPolicy = new PostAccessPolicy();
+  private final UploadValidator validator = new UploadValidator();
+  private final MediaStorage storage = new MediaStorage();
 
   private final FileRepository fileRepository;
   private final UserRepository userRepository;
@@ -64,13 +71,8 @@ public class FileServiceImplementation implements FileService {
     }
     postRepository.lockLogicalPostByRowId(postId);
     Post post = postRepository.findByIdForUpdate(postId)
-        .orElseThrow(() -> new NoSuchElementException("Post not found with id " + postId));
-    if (post.isDeleted()) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found");
-    }
-    if (!actorIsAdmin && !actorId.equals(post.getUserId())) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only post owner or admin can upload files");
-    }
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
+    accessPolicy.requireMutable(post, actorId, actorIsAdmin);
 
     User user = userRepository.findById(actorId)
         .orElseThrow(() -> new NoSuchElementException("User not found with id " + actorId));
@@ -78,29 +80,23 @@ public class FileServiceImplementation implements FileService {
       throw new IllegalArgumentException("Only maximum of 3 files allowed per post");
     }
 
-    List<UploadCandidate> candidates = new ArrayList<>(files.size());
+    List<ValidatedUpload> candidates = new ArrayList<>(files.size());
+    long totalBytes = 0;
     for (MultipartFile file : files) {
-      candidates.add(validate(file));
-    }
-
-    Path uploadRoot = Paths.get(uploadDir).toAbsolutePath().normalize();
-    Path postFolder = uploadRoot.resolve("posts").resolve(String.valueOf(postId)).normalize();
-    if (!postFolder.startsWith(uploadRoot)) {
-      throw new IOException("Invalid upload destination");
+      ValidatedUpload candidate = validator.validate(file, false);
+      totalBytes += candidate.bytes().length;
+      if (totalBytes > UploadValidator.MAX_BYTES) throw UploadValidator.tooLarge();
+      candidates.add(candidate);
     }
 
     List<Path> writtenPaths = new ArrayList<>();
     List<File> entities = new ArrayList<>(candidates.size());
     try {
-      Files.createDirectories(postFolder);
-      for (UploadCandidate candidate : candidates) {
-        Path targetLocation = postFolder.resolve(UUID.randomUUID() + candidate.extension()).normalize();
-        if (!targetLocation.startsWith(postFolder)) {
-          throw new IOException("Invalid upload destination");
-        }
+      for (ValidatedUpload candidate : candidates) {
+        Path targetLocation = storage.destination(uploadDir, "posts/" + postId, UUID.randomUUID() + candidate.extension());
 
         writtenPaths.add(targetLocation);
-        Files.write(targetLocation, candidate.bytes());
+        Files.write(targetLocation, candidate.bytes(), java.nio.file.StandardOpenOption.CREATE_NEW);
 
         File fileEntity = new File();
         fileEntity.setFileName(candidate.fileName());
@@ -117,73 +113,6 @@ public class FileServiceImplementation implements FileService {
       cleanupFiles(writtenPaths);
       throw e;
     }
-  }
-
-  private UploadCandidate validate(MultipartFile file) throws IOException {
-    if (file == null || file.isEmpty()) {
-      throw new IllegalArgumentException("Files must not be null or empty");
-    }
-
-    String originalName = file.getOriginalFilename();
-    if (originalName == null || originalName.isBlank()) {
-      throw new IllegalArgumentException("File name is required");
-    }
-    String basename = originalName.replace('\\', '/');
-    basename = basename.substring(basename.lastIndexOf('/') + 1)
-        .replaceAll("[\\p{Cntrl}]", "")
-        .replaceAll("[^A-Za-z0-9._-]", "_")
-        .replaceFirst("^\\.+", "");
-    if (basename.isBlank()) {
-      throw new IllegalArgumentException("Invalid file name");
-    }
-
-    int extensionIndex = basename.lastIndexOf('.');
-    if (extensionIndex <= 0 || extensionIndex == basename.length() - 1) {
-      throw new IllegalArgumentException("File must have a JPEG, PNG, or PDF extension");
-    }
-    String extension = basename.substring(extensionIndex).toLowerCase(Locale.ROOT);
-    String expectedType = switch (extension) {
-      case ".jpg", ".jpeg" -> "image/jpeg";
-      case ".png" -> "image/png";
-      case ".pdf" -> "application/pdf";
-      default -> throw new IllegalArgumentException("Only JPEG, PNG, or PDF files are allowed");
-    };
-
-    byte[] bytes = file.getBytes();
-    if (!expectedType.equals(detectContentType(bytes))) {
-      throw new IllegalArgumentException("File extension does not match file content");
-    }
-    String declaredType = file.getContentType();
-    if (declaredType != null && !declaredType.isBlank()
-        && !expectedType.equalsIgnoreCase(declaredType.trim())) {
-      throw new IllegalArgumentException("Declared content type does not match file content");
-    }
-    return new UploadCandidate(basename, extension, expectedType, bytes);
-  }
-
-  private String detectContentType(byte[] bytes) {
-    if (bytes.length >= 3 && (bytes[0] & 0xff) == 0xff
-        && (bytes[1] & 0xff) == 0xd8 && (bytes[2] & 0xff) == 0xff) {
-      return "image/jpeg";
-    }
-    byte[] png = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
-    if (startsWith(bytes, png)) {
-      return "image/png";
-    }
-    byte[] pdf = {0x25, 0x50, 0x44, 0x46, 0x2d};
-    return startsWith(bytes, pdf) ? "application/pdf" : null;
-  }
-
-  private boolean startsWith(byte[] bytes, byte[] prefix) {
-    if (bytes.length < prefix.length) {
-      return false;
-    }
-    for (int i = 0; i < prefix.length; i++) {
-      if (bytes[i] != prefix[i]) {
-        return false;
-      }
-    }
-    return true;
   }
 
   private void cleanupFiles(List<Path> paths) {
@@ -214,7 +143,7 @@ public class FileServiceImplementation implements FileService {
   @Override
   public Resource downloadFileV1(Long id) throws IOException {
     File fileEntity = getFileV1(id)
-        .orElseThrow(() -> new NoSuchElementException("File not found with id " + id));
+        .orElseThrow(() -> new NoSuchElementException("File not found"));
 
     try {
       Path path = resolveStoredPath(fileEntity);
@@ -233,7 +162,7 @@ public class FileServiceImplementation implements FileService {
   @Override
   public String getFileContentTypeV1(Long id) throws IOException {
     File fileEntity = getFileV1(id)
-        .orElseThrow(() -> new NoSuchElementException("File not found with id " + id));
+        .orElseThrow(() -> new NoSuchElementException("File not found"));
 
     Path path = resolveStoredPath(fileEntity);
 
@@ -241,23 +170,24 @@ public class FileServiceImplementation implements FileService {
       throw new NoSuchElementException("File not found in local storage");
     }
 
-    String contentType = Files.probeContentType(path);
-    return contentType != null ? contentType : "application/octet-stream";
+    return switch (fileEntity.getFileType() == null ? "" : fileEntity.getFileType()) {
+      case "image/jpeg", "image/png", "application/pdf" -> fileEntity.getFileType();
+      default -> "application/octet-stream";
+    };
   }
 
   @Override
   public Optional<File> getFileV1(Long id) {
-    return fileRepository.findByIdAndPostIsDeletedFalse(id);
+    return fileRepository.findByIdAndPostIsDeletedFalse(id)
+        .filter(file -> accessPolicy.canRead(file.getPost()));
   }
 
   private Path resolveStoredPath(File fileEntity) throws IOException {
-    Path uploadRoot = Paths.get(uploadDir).toAbsolutePath().normalize();
-    Path path = Paths.get(fileEntity.getFilePath()).toAbsolutePath().normalize();
-    if (!path.startsWith(uploadRoot)) {
-      throw new IOException("Invalid file storage path");
+    try {
+      // Legacy paths were relative to the process working directory, not the upload root.
+      return storage.existing(uploadDir, Paths.get(fileEntity.getFilePath()).toAbsolutePath().toString(), "posts");
+    } catch (IOException | java.nio.file.InvalidPathException e) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found");
     }
-    return path;
   }
-
-  private record UploadCandidate(String fileName, String extension, String contentType, byte[] bytes) {}
 }
