@@ -10,6 +10,9 @@ public class PostRequest {
     private String title;
 
     @NotBlank(message = "Content is required")
+    @io.swagger.v3.oas.annotations.media.Schema(description = "Post body HTML fragment. Allowed tags: p, br, h1, h2, h3, b, strong, i, em, u, s, code, blockquote, ol, ul, li. "
+            + "Only integer ol start and li value attributes are kept. Unsupported markup is stripped; use links for clickable URLs. "
+            + "After sanitization, content must contain text and fit in 65535 UTF-8 bytes.")
     private String content;
 
     @io.swagger.v3.oas.annotations.media.Schema(deprecated = true,
