@@ -1004,6 +1004,8 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PostUpdateResponse"
+        "400":
+          description: Invalid update, including an invalid attachment keep-list
         "403":
           description: Visible post may only be modified by owner/admin
         "404":
@@ -2530,6 +2532,18 @@ components:
           minItems: 0
         post_tag:
           type: string
+        retain_attachment_ids:
+          type: [array, 'null']
+          description: >-
+            Unique attachment IDs from the source revision to keep. Omitted/null keeps all; [] keeps none.
+            Retained attachments get new IDs, reuse stored bytes, and count toward the three-file limit.
+            To replace files, POST to /api/v1/files/upload before approval, passing the update response's id as post_id.
+            Historical attachments are unchanged.
+          maxItems: 3
+          minItems: 0
+          items:
+            type: integer
+            format: int64
     PostUpdateResponse:
       type: object
       properties:

@@ -38,6 +38,8 @@ Uploads use generated UUID storage names. Display filenames are reduced to bound
 
 Attachment validation finishes for the entire batch before writing files. Database rollback removes newly written objects. Avatar replacements lock the user row, save a new object/reference, delete the old object only after commit, and remove the new object on rollback. User scalar updates write only changed columns, so a profile edit loaded before avatar replacement cannot restore the stale, deleted avatar reference. Concurrent changes to the same scalar field retain last-writer semantics. Filesystem cleanup is best effort and logs failures; process crashes or unavailable storage can leave orphan objects. Reconcile against database references before any operator cleanup. Post soft deletion continues to retain attachments indefinitely; this release adds no purge operation.
 
+Post revisions can share a stored attachment path. When reconciling storage, count references from all revisions, including superseded and soft-deleted rows, before removing any object. A path can remain in use even when the matching post revision ID is not current.
+
 ## Startup configuration
 
 - `SECRET_KEY` / `jwt.secret` must be valid Base64 decoding to at least 32 secret bytes. Startup fails for missing, malformed or weak values without logging the value. Keep the existing valid secret during rollout so issued access and refresh JWTs remain usable; no key rotation is required.

@@ -9,6 +9,7 @@ import com.popman.arca.dto.v1.post.PostSubjectResponse;
 import com.popman.arca.dto.v1.post.PostUpdateRequest;
 import com.popman.arca.dto.v1.post.PostCreateResponse;
 import com.popman.arca.dto.v1.post.PostUpdateResponse;
+import com.popman.arca.entity.File;
 import com.popman.arca.entity.Post;
 import com.popman.arca.entity.PostIdentity;
 import com.popman.arca.repository.PostIdentityRepository;
@@ -205,6 +206,7 @@ public class PostServiceImplementation implements PostService {
         var links = updateRequest.getLinks() == null
                 ? currentPost.getLinks().stream().map(com.popman.arca.entity.PostLink::copy).toList()
                 : linkValidator.validate(updateRequest.getLinks());
+        var attachments = retainedAttachments(currentPost.getFiles(), updateRequest.getRetainAttachmentIds());
 
         Integer maxVersion = postRepository.findMaxVersionByPostId(currentPost.getPost_id());
         postRepository.updateIsLatestVersionByPostId(currentPost.getPost_id(), false);
@@ -221,6 +223,10 @@ public class PostServiceImplementation implements PostService {
         newVersion.setCreatedAt(LocalDateTime.now());
         newVersion.setUpdatedAt(LocalDateTime.now());
         links.forEach(newVersion::addLink);
+        for (File file : attachments) {
+            newVersion.getFiles().add(new File(newVersion, file.getUser(), file.getFileType(), file.getFileSize(),
+                    file.getFilePath(), file.getFileName(), null));
+        }
 
         if (updateRequest.getPostTag() != null && !updateRequest.getPostTag().isEmpty()) {
             Subject subject = subjectRepository.findById(Long.parseLong(updateRequest.getPostTag()))
@@ -251,6 +257,17 @@ public class PostServiceImplementation implements PostService {
                 newVersion.getVersion(),
                 newVersion.getStatus(),
                 message);
+    }
+
+    private List<File> retainedAttachments(List<File> sourceFiles, List<Long> retainIds) {
+        if (retainIds == null) return sourceFiles;
+
+        Set<Long> requested = new HashSet<>(retainIds);
+        var retained = sourceFiles.stream().filter(file -> requested.contains(file.getId())).toList();
+        if (retained.size() != retainIds.size()) {
+            throw new IllegalArgumentException("retain_attachment_ids must contain unique attachment IDs from the source revision");
+        }
+        return retained;
     }
 
     @Override
