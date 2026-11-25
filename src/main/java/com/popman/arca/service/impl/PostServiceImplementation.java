@@ -19,6 +19,7 @@ import com.popman.arca.repository.PostRepository;
 import com.popman.arca.repository.SubjectRepository;
 import com.popman.arca.repository.UserRepository;
 import com.popman.arca.service.PostService;
+import com.popman.arca.service.PostContentSanitizer;
 import com.popman.arca.service.PostAccessPolicy;
 import com.popman.arca.dto.v1.post.PostSearchCriteria;
 import com.popman.arca.dto.v1.post.PostSearchResponse;
@@ -151,6 +152,7 @@ public class PostServiceImplementation implements PostService {
     @Transactional
     public PostCreateResponse createPostV1(PostRequest request, Long actorId) {
         var links = linkValidator.validate(request.getLinks());
+        String content = PostContentSanitizer.sanitizeForWrite(request.getContent(), true);
         userRepository.findById(actorId)
                 .orElseThrow(() -> new NoSuchElementException("User not found with Id " + actorId));
 
@@ -161,7 +163,7 @@ public class PostServiceImplementation implements PostService {
 
         Post post = new Post();
         post.setPost_id(nextPostId);
-        post.setContent(request.getContent());
+        post.setContent(content);
         post.setUserId(actorId);
         post.setTitle(request.getTitle());
         post.setVersion(1);
@@ -207,6 +209,9 @@ public class PostServiceImplementation implements PostService {
                 ? currentPost.getLinks().stream().map(com.popman.arca.entity.PostLink::copy).toList()
                 : linkValidator.validate(updateRequest.getLinks());
         var attachments = retainedAttachments(currentPost.getFiles(), updateRequest.getRetainAttachmentIds());
+        String replacement = updateRequest.getContent();
+        String content = PostContentSanitizer.sanitizeForWrite(
+                replacement == null ? currentPost.getContent() : replacement, replacement != null);
 
         Integer maxVersion = postRepository.findMaxVersionByPostId(currentPost.getPost_id());
         postRepository.updateIsLatestVersionByPostId(currentPost.getPost_id(), false);
@@ -215,7 +220,7 @@ public class PostServiceImplementation implements PostService {
         newVersion.setPost_id(currentPost.getPost_id());
         newVersion.setVersion(maxVersion + 1);
         newVersion.setTitle(updateRequest.getTitle() != null ? updateRequest.getTitle() : currentPost.getTitle());
-        newVersion.setContent(updateRequest.getContent() != null ? updateRequest.getContent() : currentPost.getContent());
+        newVersion.setContent(content);
         newVersion.setStatus("PENDING_APPROVAL");
         newVersion.setUserId(currentPost.getUserId());
         newVersion.setDepartmentId(currentPost.getDepartmentId());
@@ -391,7 +396,7 @@ public class PostServiceImplementation implements PostService {
         response.setPostId(post.getPost_id());
         response.setVersion(post.getVersion());
         response.setTitle(post.getTitle());
-        response.setContent(post.getContent());
+        response.setContent(PostContentSanitizer.sanitize(post.getContent()));
         response.setStatus(post.getStatus());
         response.setIsLatestVersion(post.getIsLatestVersion());
         response.setCreatedAt(post.getCreatedAt());

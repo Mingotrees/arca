@@ -49,6 +49,8 @@ class OpenApiContractTest {
         assertFalse(generated.at("/components/schemas/PostResponse/properties").has("is_deleted"));
         assertEquals(names(checked.at("/components/schemas/PostResponse/properties")),
                 names(generated.at("/components/schemas/PostResponse/properties")));
+        assertEquals(checked.at("/components/schemas/PostResponse/properties/content"),
+                generated.at("/components/schemas/PostResponse/properties/content"));
         for (String schema : new String[]{"PostRequest", "PostUpdateRequest", "VoteRequest", "VaultRequest", "EditVaultLabelRequest", "PasswordRecoveryRequest", "PasswordResetRequest", "RefreshTokenRequest"}) {
             assertEquals(checked.path("components").path("schemas").path(schema),
                     generated.path("components").path("schemas").path(schema), "Request contract drift: " + schema);

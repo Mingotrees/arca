@@ -13,6 +13,9 @@ public class PostUpdateRequest {
     @Size(max = 30, message = "Title must not exceed 30 characters")
     private String title;
 
+    @io.swagger.v3.oas.annotations.media.Schema(types = {"string", "null"},
+            description = "Replacement post body HTML fragment. Unsupported markup is stripped; omitted/null keeps the source body after sanitization. "
+                    + "A replacement must contain text after sanitization. Sanitized content must fit in 65535 UTF-8 bytes.")
     private String content;
 
     @com.fasterxml.jackson.annotation.JsonProperty("post_tag")
