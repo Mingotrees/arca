@@ -85,6 +85,7 @@ Compose starts **only MySQL**, bound to `127.0.0.1:3306`, with a persistent data
 | Swagger UI | [localhost:20255/swagger-ui/index.html](http://localhost:20255/swagger-ui/index.html) |
 | Generated OpenAPI | [localhost:20255/v3/api-docs](http://localhost:20255/v3/api-docs) |
 | Health / metrics | `/actuator/health`, `/actuator/metrics` — admin JWT required |
+| Deployment readiness | `GET /readyz` — status only; HTTP `200`/`UP` when the app accepts traffic and can reach its database, `503` otherwise |
 
 > [!IMPORTANT]
 > **Upgrading an existing database?** Follow the [migration and rollout runbook](docs/phase-1-operations.md) before starting this version. Nonempty, unversioned schemas require a reviewed baseline at version 1. Hibernate does not update the schema automatically, and migrations reject ambiguous legacy post identities.
@@ -199,7 +200,7 @@ The multi-stage Dockerfile builds with Maven/Java 21 and runs on a Java 21 JRE. 
 
 ### CI and server deployment
 
-[Backend tests](.github/workflows/test.yml) runs verification and OpenAPI lint on pushes and pull requests. [DCISM deployment](.github/workflows/deploy-backend.yml) runs on pushes to `master` or manual dispatch, verifies the build, uploads the JAR over SSH, and checks `/v3/api-docs` after restart. It requires the `DCISM_SSH_KEY`, `DCISM_KNOWN_HOSTS`, `DCISM_HOST`, `DCISM_PORT`, `DCISM_USER`, and `DCISM_DEPLOY_PATH` repository secrets, plus the server's runtime `.env` and Java 21 installation.
+[Backend tests](.github/workflows/test.yml) runs verification and OpenAPI lint on pushes and pull requests. [DCISM deployment](.github/workflows/deploy-backend.yml) runs on pushes to `master` or manual dispatch, verifies the build, uploads the JAR over SSH, and waits for `/readyz` to return HTTP `200` with status `UP` on the application port. It requires the `DCISM_SSH_KEY`, `DCISM_KNOWN_HOSTS`, `DCISM_HOST`, `DCISM_PORT`, `DCISM_USER`, and `DCISM_DEPLOY_PATH` repository secrets, plus the server's runtime `.env` and Java 21 installation.
 
 Deletion requests expose a safe `X-Request-ID`, content-free outcome logs, and the `arca.post.deletion` timer through admin-only Actuator metrics. Metrics are process-local by default. Database baseline, retention, deployment, and forward-fix procedures live in the [operations runbook](docs/phase-1-operations.md).
 
