@@ -2,6 +2,7 @@ package com.popman.arca;
 
 import com.popman.arca.entity.User;
 import com.popman.arca.entity.UserPrincipal;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -21,8 +22,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.nio.file.Path;
 import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -31,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc(print = org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint.NONE)
 class ResourceAuthorizationIntegrationTest {
     @Autowired MockMvc mvc;
+    @Autowired ObjectMapper mapper;
     @Autowired JdbcTemplate jdbc;
     @Autowired FileServiceImplementation files;
     @Autowired UserServiceImplementation users;
@@ -80,6 +88,176 @@ class ResourceAuthorizationIntegrationTest {
         }
         mvc.perform(get("/api/v1/votes/10/my-vote").with(user(principal(actor))))
                 .andExpect(status().is(expected == 200 && actor != 2 ? 204 : expected));
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {"{\"title\":\"Edited\"}", "{\"retain_attachment_ids\":null}"}, quoteCharacter = '\'')
+    void textEditReusesBytesAndOrdinaryReaderCanDownloadAfterApproval(String edit) throws Exception {
+        long original = createAttachmentPost();
+        long oldFile = uploadAttachment(original, "%PDF-1.7 original");
+        long secondFile = uploadAttachment(original, "%PDF-1.7 original");
+        approveAttachmentPost(original);
+
+        long revision = editAttachmentPost(original, edit);
+        var newIds = jdbc.queryForList("SELECT id FROM files WHERE post_id=? ORDER BY id", Long.class, revision);
+        assertEquals(2, newIds.size());
+        assertTrue(Collections.disjoint(newIds, List.of(oldFile, secondFile)));
+        assertEquals(jdbc.queryForList("SELECT file_path FROM files WHERE post_id=? ORDER BY file_path", String.class, original),
+                jdbc.queryForList("SELECT file_path FROM files WHERE post_id=? ORDER BY file_path", String.class, revision));
+        for (long newFile : newIds) {
+            mvc.perform(get("/api/v1/files/download/" + newFile).with(user(principal(2))))
+                    .andExpect(status().isNotFound());
+        }
+
+        approveAttachmentPost(revision);
+        mvc.perform(get("/api/v1/posts/" + revision).with(user(principal(2))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.files.length()").value(2));
+        for (long newFile : newIds) assertDownload(newFile, 2, "%PDF-1.7 original");
+    }
+
+    @Test
+    void keepListAndReplacementLeavePreviousRevisionUntouched() throws Exception {
+        long original = createAttachmentPost();
+        long oldFile = uploadAttachment(original, "%PDF-1.7 old");
+        long keepFile = uploadAttachment(original, "%PDF-1.7 keep");
+        approveAttachmentPost(original);
+
+        long revision = editAttachmentPost(original, "{\"retain_attachment_ids\":[" + keepFile + "]}");
+        long retainedFile = firstAttachment(revision, 1);
+        assertNotEquals(keepFile, retainedFile);
+        long newFile = uploadAttachment(revision, "%PDF-1.7 replacement");
+        approveAttachmentPost(revision);
+
+        mvc.perform(get("/api/v1/posts/" + revision).with(user(principal(2))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.files.length()").value(2));
+        assertDownload(retainedFile, 2, "%PDF-1.7 keep");
+        assertDownload(newFile, 2, "%PDF-1.7 replacement");
+        assertDownload(oldFile, 1, "%PDF-1.7 old");
+        assertDownload(keepFile, 1, "%PDF-1.7 keep");
+
+        long cleared = editAttachmentPost(revision, "{\"retain_attachment_ids\":[]}");
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM files WHERE post_id=?", Integer.class, cleared));
+    }
+
+    @Test
+    void invalidKeepListsDoNotCreateARevision() throws Exception {
+        long original = createAttachmentPost();
+        long file = uploadAttachment(original, "%PDF-1.7 original");
+        approveAttachmentPost(original);
+        for (String ids : new String[]{"[1]", "[" + file + "," + file + "]", "[null]", "[0]", "[1,2,3,4]",
+                "[\"" + file + "\"]", "[" + file + ".5]"}) {
+            mvc.perform(put("/api/v1/posts/" + original).with(user(principal(1)))
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"retain_attachment_ids\":" + ids + "}"))
+                    .andExpect(status().isBadRequest());
+        }
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM posts WHERE post_id=(SELECT post_id FROM posts WHERE id=?)", Integer.class, original));
+    }
+
+    private long createAttachmentPost() throws Exception {
+        return mapper.readTree(mvc.perform(post("/api/v1/posts").with(user(principal(1)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"With attachments\",\"content\":\"Body\",\"department_id\":1}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).required("id").asLong();
+    }
+
+    private long uploadAttachment(long row, String bytes) throws Exception {
+        mvc.perform(multipart("/api/v1/files/upload")
+                        .file(new MockMultipartFile("file", "test.pdf", "application/pdf", bytes.getBytes(StandardCharsets.UTF_8)))
+                        .param("post_id", Long.toString(row)).with(user(principal(1))))
+                .andExpect(status().isOk());
+        return jdbc.queryForObject("SELECT MAX(id) FROM files WHERE post_id=?", Long.class, row);
+    }
+
+    private void approveAttachmentPost(long row) throws Exception {
+        mvc.perform(post("/api/v1/posts/" + row + "/approve").with(user(principal(3)))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"approved\":true}"))
+                .andExpect(status().isOk());
+    }
+
+    private long editAttachmentPost(long row, String body) throws Exception {
+        return mapper.readTree(mvc.perform(put("/api/v1/posts/" + row).with(user(principal(1)))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).required("id").asLong();
+    }
+
+    private long firstAttachment(long row, long actor) throws Exception {
+        return mapper.readTree(mvc.perform(get("/api/v1/posts/" + row).with(user(principal(actor))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.files.length()").value(1))
+                .andReturn().getResponse().getContentAsString()).requiredAt("/files/0/id").asLong();
+    }
+
+    private void assertDownload(long file, long actor, String bytes) throws Exception {
+        mvc.perform(get("/api/v1/files/download/" + file).with(user(principal(actor))))
+                .andExpect(status().isOk()).andExpect(content().bytes(bytes.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void postCreationStoresAllowedLexicalFormattingWithoutEditorAttributes() throws Exception {
+        String body = """
+                <h1 class="text-2xl">Heading</h1><h2>Section</h2><h3>Topic</h3>
+                <p style="text-align: center" data-editor="true"><u><s><i><b><strong>One</strong></b></i></s></u><br><code>Two</code></p>
+                <blockquote><em>Quote</em></blockquote><ul><li>Bullet</li></ul><ol start="2"><li value="2">Number</li></ol>
+                """.strip();
+        String expected = """
+                <h1>Heading</h1><h2>Section</h2><h3>Topic</h3>
+                <p><u><s><i><b><strong>One</strong></b></i></s></u><br /><code>Two</code></p>
+                <blockquote><em>Quote</em></blockquote><ul><li>Bullet</li></ul><ol start="2"><li value="2">Number</li></ol>
+                """.strip();
+
+        long id = mapper.readTree(mvc.perform(post("/api/v1/posts").with(user(principal(1)))
+                        .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(
+                                Map.of("title", "Formatted post", "content", body, "department_id", 1))))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).required("id").asLong();
+
+        assertEquals(expected, jdbc.queryForObject("SELECT content FROM posts WHERE id=?", String.class, id));
+        mvc.perform(get("/api/v1/posts/" + id).with(user(principal(1))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content").value(expected));
+    }
+
+    @Test
+    void postEditStripsUnsupportedMarkupAndKeepsLinksSeparate() throws Exception {
+        var edit = Map.of("content", "<p id=note onclick=ignored><span>Read </span><a href=\"https://example.test\">this</a></p>"
+                        + "<script>discarded</script><img src=\"https://example.test/pic.png\">",
+                "links", List.of(Map.of("url", "https://example.test/resource")));
+        long revision = editAttachmentPost(10, mapper.writeValueAsString(edit));
+        assertEquals("<p>Read this</p>", jdbc.queryForObject("SELECT content FROM posts WHERE id=?", String.class, revision));
+        mvc.perform(get("/api/v1/posts/" + revision).with(user(principal(1))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content").value("<p>Read this</p>"))
+                .andExpect(jsonPath("$.links[0].url").value("https://example.test/resource"));
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"{\"title\":\"Legacy text retained\"}", "{\"content\":null}"})
+    void legacyHtmlIsSanitizedInReadsAndInAnInheritedRevision(String edit) throws Exception {
+        String legacy = "<p><b>Old</b><iframe src=\"https://example.test\"></iframe></p>";
+        jdbc.update("UPDATE posts SET content=? WHERE id IN (10,11)", legacy);
+        mvc.perform(get("/api/v1/posts/pending").with(user(principal(3))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].content").value("<p><b>Old</b></p>"));
+        for (String path : List.of("/api/v1/posts", "/api/v1/posts/history/7")) {
+            mvc.perform(get(path).with(user(principal(2))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$[0].content").value("<p><b>Old</b></p>"));
+        }
+        mvc.perform(get("/api/v1/posts/10").with(user(principal(2))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content").value("<p><b>Old</b></p>"));
+        mvc.perform(get("/api/v1/posts/search").with(user(principal(2))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].content").value("<p><b>Old</b></p>"));
+        long revision = editAttachmentPost(10, edit);
+
+        assertEquals("<p><b>Old</b></p>", jdbc.queryForObject("SELECT content FROM posts WHERE id=?", String.class, revision));
+        assertEquals(legacy, jdbc.queryForObject("SELECT content FROM posts WHERE id=10", String.class));
+    }
+
+    @Test
+    void writesRejectEmptyOrOversizedSanitizedBodiesWithoutCreatingRows() throws Exception {
+        for (String body : List.of("<img>", "<p><br></p>", "'".repeat(14_000))) {
+            mvc.perform(post("/api/v1/posts").with(user(principal(1))).contentType(MediaType.APPLICATION_JSON)
+                            .content(mapper.writeValueAsString(Map.of("title", "Invalid body", "department_id", 1, "content", body))))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(put("/api/v1/posts/10").with(user(principal(1))).contentType(MediaType.APPLICATION_JSON)
+                            .content(mapper.writeValueAsString(Map.of("content", body))))
+                    .andExpect(status().isBadRequest());
+        }
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM posts", Integer.class));
     }
 
     @Test

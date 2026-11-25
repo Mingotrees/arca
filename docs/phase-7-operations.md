@@ -7,7 +7,7 @@ Existing post creation and version-update routes accept optional `links`:
 ```json
 {
   "title": "Reference notes",
-  "content": "Existing rich text and inline URLs remain unchanged.",
+  "content": "<p>See the <strong>references</strong> below.</p>",
   "department_id": 1,
   "links": [
     {"url": "https://example.org/reference", "label": "Reference"},
@@ -16,7 +16,7 @@ Existing post creation and version-update routes accept optional `links`:
 }
 ```
 
-Existing create/update success envelopes remain unchanged. Read/list/search/history `PostResponse` adds `links`, always an ordered array, including `[]` for old posts or no links. Each item contains `url`, optional/null `label`, and zero-based `position`. Internal canonical keys, child IDs and persistence timestamps are not returned. Fields such as title/content continue their existing wire behavior; no inline URL is extracted, changed or migrated.
+Existing create/update success envelopes remain unchanged. Read/list/search/history `PostResponse` adds `links`, always an ordered array, including `[]` for old posts or no links. Each item contains `url`, optional/null `label`, and zero-based `position`. Internal canonical keys, child IDs and persistence timestamps are not returned. Inline URLs are not converted to structured links. See the [post body contract](post-content.md) for HTML handling.
 
 Creation with omitted/null links stores none. Updating an approved version with omitted/null links **copies the addressed source row's links into new child rows** in the new pending version. Explicit `[]` clears links only in that new revision; a nonempty array replaces the full list. Child IDs/entities are never shared between versions. Approval/rejection retains the submitted version's set; a historical read reports that row's original set. The existing logical-post lock serializes version mutation and deletion. Link validation happens before any persistent creation/version/latest-flag change; writes are atomic with the post transaction.
 

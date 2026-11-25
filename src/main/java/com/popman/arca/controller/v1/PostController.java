@@ -130,6 +130,7 @@ public class PostController {
 
     @PutMapping("/{rowId}")
     @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = PostUpdateResponse.class)))
+    @ApiResponse(responseCode = "400", description = "Invalid update, including an invalid attachment keep-list", content = @Content)
     @ApiResponse(responseCode = "403", description = "Visible post may only be modified by owner/admin", content = @Content)
     @ApiResponse(responseCode = "404", description = "Post missing, deleted or inaccessible", content = @Content)
     public ResponseEntity<PostUpdateResponse> updatePost(

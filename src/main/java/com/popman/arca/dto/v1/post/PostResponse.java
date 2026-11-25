@@ -11,6 +11,7 @@ public class PostResponse {
     private Integer postId;
     private Integer version;
     private String title;
+    @io.swagger.v3.oas.annotations.media.Schema(description = "Sanitized post body HTML fragment, including for legacy revisions. Use only in an HTML element body.")
     private String content;
     private String status;
     private Long userId;

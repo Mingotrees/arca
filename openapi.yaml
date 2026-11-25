@@ -1004,6 +1004,8 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PostUpdateResponse"
+        "400":
+          description: Invalid update, including an invalid attachment keep-list
         "403":
           description: Visible post may only be modified by owner/admin
         "404":
@@ -2520,7 +2522,10 @@ components:
           maxLength: 30
           minLength: 0
         content:
-          type: string
+          type: [string, 'null']
+          description: >-
+            Replacement post body HTML fragment. Unsupported markup is stripped; omitted/null keeps the source body after sanitization.
+            A replacement must contain text after sanitization. Sanitized content must fit in 65535 UTF-8 bytes.
         links:
           type: [array, 'null']
           description: Ordered HTTP(S) links, maximum 10. Omitted/null copies source version links; [] clears only the new version; canonical duplicates reject the request.
@@ -2530,6 +2535,18 @@ components:
           minItems: 0
         post_tag:
           type: string
+        retain_attachment_ids:
+          type: [array, 'null']
+          description: >-
+            Unique attachment IDs from the source revision to keep. Omitted/null keeps all; [] keeps none.
+            Retained attachments get new IDs, reuse stored bytes, and count toward the three-file limit.
+            To replace files, POST to /api/v1/files/upload before approval, passing the update response's id as post_id.
+            Historical attachments are unchanged.
+          maxItems: 3
+          minItems: 0
+          items:
+            type: integer
+            format: int64
     PostUpdateResponse:
       type: object
       properties:
@@ -2637,6 +2654,10 @@ components:
           minLength: 0
         content:
           type: string
+          description: >-
+            Post body HTML fragment. Allowed tags: p, br, h1, h2, h3, b, strong, i, em, u, s, code, blockquote, ol, ul, li.
+            Only integer ol start and li value attributes are kept. Unsupported markup is stripped; use links for clickable URLs.
+            After sanitization, content must contain text and fit in 65535 UTF-8 bytes.
           minLength: 1
         links:
           type: [array, 'null']
@@ -2886,6 +2907,7 @@ components:
           type: string
         content:
           type: string
+          description: Sanitized post body HTML fragment, including for legacy revisions. Use only in an HTML element body.
         status:
           type: string
         userId:
