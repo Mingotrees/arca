@@ -61,6 +61,7 @@ public class SecurityConfig {
         .csrf(csrf -> csrf.disable())
         .authorizeHttpRequests(auth -> auth
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/readyz").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
                     "/api/v1/auth/logout", "/api/v1/auth/password-recovery", "/api/v1/auth/password-reset").permitAll()
             .requestMatchers("/actuator/**").hasAuthority("ROLE_ADMIN")
